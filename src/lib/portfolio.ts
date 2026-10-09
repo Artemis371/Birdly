@@ -26,7 +26,7 @@ export type PositionView = {
 
 export type TradeView = {
   id: number;
-  kind: "buy" | "sell" | "payout";
+  kind: "buy" | "sell" | "payout" | "refund";
   outcomeName: string;
   label: string;
   eventSlug: string;

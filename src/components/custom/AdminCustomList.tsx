@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { CustomMarket } from "@/lib/custom/types";
 import { compactUsd } from "@/lib/format";
+import { customMarketTimeZone } from "@/config/site";
+import { formatInZone } from "@/lib/tz";
 
 export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -33,7 +35,7 @@ export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
     ["Needs a winner", markets.filter((m) => m.status === "open" && m.ended)],
     ["Drafts", markets.filter((m) => m.status === "draft")],
     ["Open", markets.filter((m) => m.status === "open" && !m.ended)],
-    ["Resolved", markets.filter((m) => m.status === "resolved")],
+    ["Resolved or cancelled", markets.filter((m) => m.status === "resolved" || m.status === "cancelled")],
   ];
 
   return (
@@ -48,8 +50,8 @@ export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
                 <li key={m.id} className="rounded-2xl border border-line bg-surface p-4 text-sm">
                   <div className="font-semibold">{m.title}</div>
                   <div className="mt-0.5 text-xs text-muted">
-                    {m.outcomes.length} outcomes · ends {new Date(m.endAt).toLocaleDateString()} · liquidity {m.liquidity.toLocaleString()} · {compactUsd(m.volume)} traded
-                    {m.status === "resolved" ? ` · winner: ${m.outcomes[m.winningIndex ?? 0]}` : ""}
+                    {m.outcomes.length} outcomes · ends {formatInZone(m.endAt, customMarketTimeZone.zone)} · liquidity {m.liquidity.toLocaleString()} · {compactUsd(m.volume)} traded
+                    {m.status === "resolved" ? ` · winner: ${m.outcomes[m.winningIndex ?? 0]}` : m.status === "cancelled" ? " · cancelled, refunded" : ""}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs">
                     {m.status === "draft" ? (
@@ -57,14 +59,14 @@ export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
                         Publish
                       </button>
                     ) : null}
-                    {m.status !== "resolved" ? (
+                    {m.status !== "resolved" && m.status !== "cancelled" ? (
                       <Link href={`/admin/leahys/${m.id}`} className="rounded-lg bg-surface-2 px-3 py-2 font-medium hover:bg-line">
                         Edit
                       </Link>
                     ) : null}
                     {m.status === "open" ? (
                       <Link href={`/admin/leahys/${m.id}/resolve`} className={`rounded-lg px-3 py-2 font-medium ${m.ended ? "bg-warn/20 text-warn" : "bg-surface-2 hover:bg-line"}`}>
-                        {m.ended ? "Pick winner" : "Resolve early"}
+                        {m.ended ? "Pick winner / cancel" : "Resolve or cancel"}
                       </Link>
                     ) : null}
                     <Link href={`/leahys/${m.slug}`} className="rounded-lg bg-surface-2 px-3 py-2 font-medium hover:bg-line">

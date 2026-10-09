@@ -20,6 +20,7 @@ function market(over: Partial<CustomMarket> = {}): CustomMarket {
     winningIndex: null,
     publishedAt: "2026-10-09T00:00:00Z",
     resolvedAt: null,
+    cancelledAt: null,
     notifySentAt: null,
     prices: prices(q, 1000),
     ended: false,
@@ -88,6 +89,7 @@ describe("custom market trades", () => {
     expect(await getCustomQuote("u1", req, deps({ getMarket: async () => market({ status: "draft" }) }))).toMatchObject({ code: "not_found" });
     expect(await getCustomQuote("u1", req, deps({ getMarket: async () => market({ ended: true }) }))).toMatchObject({ code: "market_ended" });
     expect(await getCustomQuote("u1", req, deps({ getMarket: async () => market({ status: "resolved" }) }))).toMatchObject({ code: "market_resolved" });
+    expect(await getCustomQuote("u1", req, deps({ getMarket: async () => market({ status: "cancelled" }) }))).toMatchObject({ code: "market_cancelled" });
   });
 
   it("market ends between quote and execute: refused", async () => {

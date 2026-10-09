@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { refresh, trading } from "@/config/site";
+import { customMarketTimeZone, refresh, trading } from "@/config/site";
+import { formatInZone } from "@/lib/tz";
 import { ConfirmSheet, QUOTE_ERRORS, QuoteRows, type Confirming, type OkQuote } from "@/components/markets/TradePanel";
 import { PriceChart } from "@/components/markets/PriceChart";
 import { type CustomMarket, customTokenId } from "@/lib/custom/types";
@@ -35,9 +36,13 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
   }, [market.slug, market.status]);
 
   const resolved = market.status === "resolved";
+  const cancelled = market.status === "cancelled";
+  const tz = customMarketTimeZone.zone;
   const blocked = market.status === "draft"
     ? "This is a draft. Publish it from the admin page to open trading."
-    : resolved
+    : cancelled
+      ? "This market was cancelled and everyone was refunded."
+      : resolved
       ? `Resolved: ${market.outcomes[market.winningIndex ?? 0]}.`
       : market.ended
         ? "Trading closed at the end date. Waiting for the admin to pick the winner."
@@ -49,13 +54,17 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       <div className="min-w-0 space-y-4">
-        {resolved ? (
+        {cancelled ? (
+          <div className="rounded-xl border border-line bg-surface-2 px-4 py-3 text-sm">
+            This market was <strong>cancelled</strong>. Everyone got back what they paid in, minus anything they&apos;d already got back from selling.
+          </div>
+        ) : resolved ? (
           <div className="rounded-xl border border-yes/40 bg-yes/10 px-4 py-3 text-sm text-yes">
             Resolved to <strong>{market.outcomes[market.winningIndex ?? 0]}</strong>. Winning shares paid $1 each.
           </div>
         ) : market.ended ? (
           <div className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn">
-            Trading closed on {new Date(market.endAt).toLocaleDateString()}. Waiting for the admin to pick the winner.
+            Trading closed {formatInZone(market.endAt, tz)}. Waiting for the admin to pick the winner.
             {viewer.isAdmin ? (
               <Link href={`/admin/leahys/${market.id}/resolve`} className="ml-2 font-semibold underline">
                 Resolve now
@@ -69,7 +78,7 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
             key={selected}
             tokenId={customTokenId(market.id, selected)}
             label={market.outcomes[selected]}
-            liveProb={resolved ? null : prices[selected]}
+            liveProb={resolved || cancelled ? null : prices[selected]}
             historyBase={`/api/custom/${market.slug}/history?i=${selected}`}
           />
         </div>
@@ -91,7 +100,7 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
                     <div className="text-xs text-accent">You hold {fmtShares(viewer.holdings[customTokenId(market.id, i)])} shares</div>
                   ) : null}
                 </button>
-                <span className="tabular w-14 text-right text-lg font-bold">{resolved ? (i === market.winningIndex ? "100%" : "0%") : pct(prices[i])}</span>
+                <span className="tabular w-14 text-right text-lg font-bold">{cancelled ? "--" : resolved ? (i === market.winningIndex ? "100%" : "0%") : pct(prices[i])}</span>
                 {!blocked ? (
                   <button
                     onClick={() => {
@@ -135,7 +144,7 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
             <p className="whitespace-pre-line text-muted">{market.rules || "No rules written yet."}</p>
           </div>
           <p className="text-xs text-muted">
-            Ends {new Date(market.endAt).toLocaleString()} · {compactUsd(market.volume)} traded · Priced by an automated market maker (liquidity {market.liquidity.toLocaleString()})
+            {market.ended || resolved || cancelled ? "Ended" : "Ends"} {formatInZone(market.endAt, tz)} ({customMarketTimeZone.label}) · {compactUsd(market.volume)} traded · Priced by an automated market maker (liquidity {market.liquidity.toLocaleString()})
           </p>
         </section>
       </div>

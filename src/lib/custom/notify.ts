@@ -1,5 +1,6 @@
 import "server-only";
-import { site } from "@/config/site";
+import { customMarketTimeZone, site } from "@/config/site";
+import { formatInZone } from "@/lib/tz";
 import { emailConfigured, escapeHtml, sendAdminEmail } from "@/lib/email";
 import { env } from "@/lib/env";
 import { adminClient } from "@/lib/supabase/admin";
@@ -31,7 +32,7 @@ export async function notifyEndedCustomMarkets(): Promise<{ sent: number; failed
     if (!claimed?.length) continue; // someone else got it
 
     const link = `${env.siteUrl()}/admin/leahys/${m.id}/resolve`;
-    const ended = new Date(m.end_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+    const ended = formatInZone(m.end_at, customMarketTimeZone.zone);
     const r = await sendAdminEmail(
       `${site.name}: pick the winner for "${m.title}"`,
       `<p>The ${escapeHtml(site.name)} market <strong>${escapeHtml(m.title)}</strong> ended on ${ended}. Trading is closed and it's waiting for your final decision.</p>

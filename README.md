@@ -152,7 +152,16 @@ plan allows one run per day and may start it anytime within that hour).
    (Hannah's job, Beahy's leg, Beahy and Harry McLary, Liam's garage floor).
    Publish each from **Admin -> Leahys markets -> Publish**.
 
-### 2. Reminder emails (Resend)
+### 2. Run migration 0004
+
+Adds cancel-and-refund for Leahys markets and moves the four seeded drafts'
+end dates to 11:59 PM Hawaii time. Copy `supabase/migrations/0004_cancel_and_hawaii.sql`
+from the **Raw** view on GitHub, paste into the SQL Editor, **Run**. Safe to
+re-run. It only changes the dates of markets that are still drafts; if you
+already published one, change its end date in the edit form (allowed even
+after trades).
+
+### 3. Reminder emails (Resend)
 
 When a Leahys market passes its end date, trading closes and the daily cron
 emails you once, with a link straight to its resolve page.
@@ -201,9 +210,21 @@ Without these, everything still works: ended markets show up under
 - **Charts** record a price point on every trade.
 - **Editing:** drafts (and published markets with no trades yet) are fully
   editable. Once anyone has traded, only the description and end date can change.
-- **Resolving:** Admin -> Leahys markets -> **Resolve early** (any time after
-  publishing) or **Pick winner** (after the end date). Winning shares pay $1,
+- **Resolving:** Admin -> Leahys markets -> **Resolve or cancel** (any time
+  after publishing, so "when will X happen" markets can resolve early) or
+  **Pick winner / cancel** (after the end date). Winning shares pay $1,
   everything else $0, in one transaction that can't pay twice.
+- **Cancelling:** on the same page, **Cancel market and refund** shows exactly
+  who gets what, then asks you to confirm. Each person gets back
+  `total paid in buys - total received from sells` for that market, floored
+  at $0 (someone who already sold at a profit gets nothing more, and nobody is
+  ever charged). Positions are zeroed, a "refund" line appears in their trade
+  history and the activity feed, and it's logged in admin actions. Running it
+  twice does nothing the second time, and a cancelled market can never be
+  resolved, traded or edited.
+- **Time zone:** end dates are entered and shown in Hawaii time
+  (`customMarketTimeZone` in `src/config/site.ts`), e.g. "Mar 31, 2027,
+  11:59 PM HST", regardless of the viewer's device time zone.
 
 ## Run it locally
 
@@ -318,6 +339,7 @@ src/lib/resolution/           payout rule (decide.ts) + shared resolution step (
 src/lib/lmsr/                 LMSR market maker math (mirrored in SQL)
 src/lib/custom/               Leahys markets: loading, trading, validation, reminder emails
 src/test/custom.db.test.ts    Leahys markets in PGlite: seeds, trades, editing locks, resolution, RLS
+src/test/cancel.db.test.ts    cancel + refund amounts, idempotency, no resolve after cancel, 0004 re-runs
 src/app/api/cron/daily/       daily cron: resolution + snapshots (needs CRON_SECRET)
 src/test/db.test.ts           runs the real migrations in PGlite: atomic signup, trades, RLS
 src/test/resolution.db.test.ts  payouts, 50/50, double resolution, re-running 0002

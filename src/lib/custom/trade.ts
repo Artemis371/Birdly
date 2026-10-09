@@ -36,6 +36,7 @@ const ERRORS: Record<string, string> = {
   insufficient_shares: "You don't have that many shares to sell.",
   account_inactive: "Your account is deactivated.",
   market_resolved: "This market has already been resolved.",
+  market_cancelled: "This market was cancelled and everyone was refunded.",
   market_ended: "Trading on this market has closed. Waiting for the admin to pick the winner.",
   not_found: "That market wasn't found.",
   amount_too_small: "Amount too small to fill.",
@@ -57,6 +58,7 @@ function valid(r: Partial<CustomTradeRequest>): r is CustomTradeRequest {
 function tradable(m: CustomMarket | null, index: number): CustomTradeError | null {
   if (!m || m.status === "draft") return err(404, "not_found");
   if (m.status === "resolved") return err(409, "market_resolved");
+  if (m.status === "cancelled") return err(409, "market_cancelled");
   if (m.ended) return err(409, "market_ended");
   if (index >= m.outcomes.length) return err(404, "not_found", "That outcome wasn't found.");
   return null;

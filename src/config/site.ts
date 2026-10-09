@@ -68,3 +68,7 @@ export const categories = [
 
 // Our own private markets tab (members only). Shown second in the category row.
 export const customTab = { label: "Leahys", slug: "leahys" } as const;
+
+// Time zone for custom ("Leahys") market end dates: what the admin types in
+// the edit form and what everyone sees on market pages.
+export const customMarketTimeZone = { zone: "Pacific/Honolulu", label: "Hawaii time" } as const;

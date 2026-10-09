@@ -129,17 +129,21 @@ export default async function PortfolioPage(props: PageProps<"/portfolio">) {
               <li key={t.id} className="flex items-center gap-3 px-4 py-3 text-sm">
                 <span
                   className={`w-12 shrink-0 text-xs font-semibold uppercase ${
-                    t.kind === "buy" ? "text-accent" : t.kind === "sell" ? "text-warn" : t.price >= 1 ? "text-yes" : t.price > 0 ? "text-muted" : "text-no"
+                    t.kind === "buy" ? "text-accent" : t.kind === "sell" ? "text-warn" : t.kind === "refund" ? "text-muted" : t.price >= 1 ? "text-yes" : t.price > 0 ? "text-muted" : "text-no"
                   }`}
                 >
-                  {t.kind === "payout" ? (t.price >= 1 ? "won" : t.price > 0 ? "split" : "lost") : t.kind}
+                  {t.kind === "payout" ? (t.price >= 1 ? "won" : t.price > 0 ? "split" : "lost") : t.kind === "refund" ? "refund" : t.kind}
                 </span>
                 <Link href={t.isCustom ? `/leahys/${t.eventSlug}` : `/event/${t.eventSlug}`} className="min-w-0 flex-1">
                   <div className="truncate">
                     {t.outcomeName} · {t.label}
                   </div>
                   <div className="text-xs text-muted">
-                    {t.kind === "payout" ? `${shares(t.shares)} sh resolved at ${usd(t.price)} each` : `${shares(t.shares)} sh @ ${cents(t.price)}`} ·{" "}
+                    {t.kind === "refund"
+                      ? "Market cancelled, money returned"
+                      : t.kind === "payout"
+                        ? `${shares(t.shares)} sh resolved at ${usd(t.price)} each`
+                        : `${shares(t.shares)} sh @ ${cents(t.price)}`} ·{" "}
                     {new Date(t.createdAt).toLocaleString()}
                   </div>
                 </Link>

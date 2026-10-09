@@ -303,7 +303,7 @@ end;
 $$;
 
 -- ================================================================ seeds
--- Four drafts to review and publish. End dates are end of day, US Eastern.
+-- Four drafts to review and publish. End dates are 11:59 PM Hawaii time.
 insert into public.custom_markets (slug, title, description, rules, outcomes, q, liquidity, end_at) values
 (
   'hannahs-next-job',
@@ -311,7 +311,7 @@ insert into public.custom_markets (slug, title, description, rules, outcomes, q,
   'Hannah is between jobs. Where does she land next?',
   'Resolves to the first new job Hannah actually starts (first shift worked) before the end date. "Something else" if it isn''t on the list. "Still between jobs" if she hasn''t started one by the end date.',
   array['Bakery', 'Librarian', 'Florist', 'Barista', 'Dog walker', 'Yoga instructor', 'Candle shop', 'Something else', 'Still between jobs'],
-  array_fill(0::double precision, array[9]), 1000, '2027-03-31 23:59:59 America/New_York'
+  array_fill(0::double precision, array[9]), 1000, '2027-03-31 23:59:59 Pacific/Honolulu'
 ),
 (
   'beahy-other-leg',
@@ -319,7 +319,7 @@ insert into public.custom_markets (slug, title, description, rules, outcomes, q,
   'One leg down. Place your bets on the other one.',
   'Resolves to the range containing the date of a confirmed broken leg (the other one). Sprains and bruises do not count.',
   array['Before Jan 1, 2027', 'Jan to Jun 2027', 'Jul to Dec 2027', 'Not by end of 2027'],
-  array_fill(0::double precision, array[4]), 1000, '2027-12-31 23:59:59 America/New_York'
+  array_fill(0::double precision, array[4]), 1000, '2027-12-31 23:59:59 Pacific/Honolulu'
 ),
 (
   'beahy-harry-mclary',
@@ -327,7 +327,7 @@ insert into public.custom_markets (slug, title, description, rules, outcomes, q,
   'How long does Harry McLary last?',
   'Resolves to the range containing the date it becomes official, confirmed by Beahy.',
   array['Before Jan 1, 2027', 'Jan to Jun 2027', 'Jul to Dec 2027', 'Not by end of 2027'],
-  array_fill(0::double precision, array[4]), 1000, '2027-12-31 23:59:59 America/New_York'
+  array_fill(0::double precision, array[4]), 1000, '2027-12-31 23:59:59 Pacific/Honolulu'
 ),
 (
   'liam-garage-flake',
@@ -335,7 +335,7 @@ insert into public.custom_markets (slug, title, description, rules, outcomes, q,
   'The garage floor saga continues.',
   'Yes if Liam applies any additional flake to the garage floor before the end date, confirmed by photo. Touch-ups count.',
   array['Yes', 'No'],
-  array_fill(0::double precision, array[2]), 1000, '2027-06-30 23:59:59 America/New_York'
+  array_fill(0::double precision, array[2]), 1000, '2027-06-30 23:59:59 Pacific/Honolulu'
 )
 on conflict (slug) do nothing;
 

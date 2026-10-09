@@ -4,12 +4,14 @@ import { validateCustomInput } from "./validate";
 
 const DB_ERRORS: Record<string, string> = {
   locked_after_trades: "This market has trades, so only the description and end date can change.",
-  already_resolved: "This market is already resolved and can't be edited.",
+  already_resolved: "This market is already resolved.",
   not_found: "That market wasn't found.",
   not_a_draft: "Only drafts can be deleted.",
   invalid_winner: "Pick one of the outcomes.",
   not_published: "Publish the market before resolving it.",
   custom_markets_slug_key: "Another market already uses that URL name.",
+  market_cancelled: "This market was cancelled, so it can't be resolved.",
+  market_closed: "This market is closed (resolved or cancelled) and can't be changed.",
 };
 
 export function friendly(message: string): string {

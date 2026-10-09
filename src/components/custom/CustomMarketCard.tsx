@@ -9,7 +9,8 @@ export function CustomMarketCard({ m }: { m: CustomMarket }) {
   const href = `/leahys/${m.slug}`;
   const resolved = m.status === "resolved";
   const order = m.outcomes.map((name, i) => ({ name, i })).sort((a, b) => m.prices[b.i] - m.prices[a.i]);
-  const status = resolved ? `Resolved: ${m.outcomes[m.winningIndex ?? 0]}` : m.ended ? "Trading closed" : timeLeft(m.endAt);
+  const cancelled = m.status === "cancelled";
+  const status = cancelled ? "Cancelled, refunded" : resolved ? `Resolved: ${m.outcomes[m.winningIndex ?? 0]}` : m.ended ? "Trading closed" : timeLeft(m.endAt);
 
   return (
     <article className="flex min-w-0 flex-col rounded-2xl border border-line bg-surface p-4 transition-colors hover:border-muted/40">
@@ -20,7 +21,7 @@ export function CustomMarketCard({ m }: { m: CustomMarket }) {
         <h3 className="line-clamp-2 flex-1 text-[15px] font-semibold leading-snug">{m.title}</h3>
       </Link>
       <ul className="mt-3 flex-1 space-y-1.5">
-        {(resolved ? order.filter((o) => o.i === m.winningIndex) : order.slice(0, ROWS)).map((o) => (
+        {(cancelled ? [] : resolved ? order.filter((o) => o.i === m.winningIndex) : order.slice(0, ROWS)).map((o) => (
           <li key={o.i}>
             <Link href={href} className="flex items-center gap-2 rounded-lg py-1 text-sm hover:bg-surface-2">
               <span className="min-w-0 flex-1 truncate text-text/90">{o.name}</span>
@@ -29,11 +30,11 @@ export function CustomMarketCard({ m }: { m: CustomMarket }) {
             </Link>
           </li>
         ))}
-        {!resolved && m.outcomes.length > ROWS ? <li className="pt-0.5 text-xs text-muted">+{m.outcomes.length - ROWS} more</li> : null}
+        {!resolved && !cancelled && m.outcomes.length > ROWS ? <li className="pt-0.5 text-xs text-muted">+{m.outcomes.length - ROWS} more</li> : null}
       </ul>
       <div className="mt-3 flex items-center justify-between text-xs text-muted">
         <span>{compactUsd(m.volume)} traded</span>
-        {status ? <span className={resolved ? "text-yes" : m.ended ? "text-warn" : ""}>{status}</span> : null}
+        {status ? <span className={resolved ? "text-yes" : cancelled ? "text-muted" : m.ended ? "text-warn" : ""}>{status}</span> : null}
       </div>
     </article>
   );

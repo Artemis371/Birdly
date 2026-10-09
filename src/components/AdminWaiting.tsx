@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import type { WaitingMarket } from "@/lib/admin";
 import { shares, usd } from "@/lib/format";
+import { customMarketTimeZone } from "@/config/site";
+import { formatInZone } from "@/lib/tz";
 
 function ago(iso: string | null): string {
   if (!iso) return "never";
@@ -66,10 +68,10 @@ export function AdminWaiting({ markets, custom, emailOn }: { markets: WaitingMar
                   Pick winner
                 </Link>
               </div>
-              <p className="mt-2">Ended {new Date(m.endAt).toLocaleDateString()}. Trading is closed and it&apos;s waiting for you to pick the winner.</p>
+              <p className="mt-2">Ended {formatInZone(m.endAt, customMarketTimeZone.zone)}. Trading is closed and it&apos;s waiting for you to pick the winner.</p>
               <p className="mt-1 text-xs text-muted">
                 {m.notifySentAt
-                  ? `Reminder email sent ${new Date(m.notifySentAt).toLocaleDateString()}.`
+                  ? `Reminder email sent ${formatInZone(m.notifySentAt, customMarketTimeZone.zone, { time: false })}.`
                   : emailOn
                     ? "Reminder email goes out with the next daily run."
                     : "Reminder emails are off (RESEND_API_KEY / ADMIN_NOTIFY_EMAIL not set)."}

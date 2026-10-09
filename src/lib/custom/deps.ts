@@ -8,7 +8,7 @@ import { currentSeasonId } from "@/lib/trading/deps";
 import { getCustomBySlug } from "./markets";
 import type { CustomTradeDeps } from "./trade";
 
-const KNOWN = ["insufficient_funds", "insufficient_shares", "account_inactive", "market_resolved", "market_ended", "price_moved", "not_found", "amount_too_small", "invalid_market", "invalid_amount"];
+const KNOWN = ["insufficient_funds", "insufficient_shares", "account_inactive", "market_resolved", "market_cancelled", "market_ended", "price_moved", "not_found", "amount_too_small", "invalid_market", "invalid_amount"];
 
 export function customTradeDeps(): CustomTradeDeps {
   const db = adminClient();

@@ -18,10 +18,11 @@ type Row = {
   winning_index: number | null;
   published_at: string | null;
   resolved_at: string | null;
+  cancelled_at: string | null;
   notify_sent_at: string | null;
 };
 
-const COLS = "id, slug, title, description, rules, outcomes, q, liquidity, end_at, status, winning_index, published_at, resolved_at, notify_sent_at";
+const COLS = "id, slug, title, description, rules, outcomes, q, liquidity, end_at, status, winning_index, published_at, resolved_at, cancelled_at, notify_sent_at";
 
 async function volumes(ids: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
@@ -56,6 +57,7 @@ function toMarket(r: Row, volume: number | undefined): CustomMarket {
     winningIndex: r.winning_index,
     publishedAt: r.published_at,
     resolvedAt: r.resolved_at,
+    cancelledAt: r.cancelled_at,
     notifySentAt: r.notify_sent_at,
     prices: lmsrPrices(q, b),
     ended: Date.parse(r.end_at) <= Date.now(),
@@ -74,7 +76,8 @@ export async function listPublishedCustom(): Promise<CustomMarket[]> {
   const { data, error } = await adminClient().from("custom_markets").select(COLS).neq("status", "draft").order("end_at");
   if (error) throw new Error(error.message);
   const ms = await withVolumes((data ?? []) as Row[]);
-  return ms.sort((a, b) => Number(a.status === "resolved") - Number(b.status === "resolved"));
+  const closed = (m: CustomMarket) => Number(m.status === "resolved" || m.status === "cancelled");
+  return ms.sort((a, b) => closed(a) - closed(b));
 }
 
 export async function listAllCustom(): Promise<CustomMarket[]> {
@@ -111,7 +114,7 @@ export async function customHistory(m: CustomMarket, index: number, range: Chart
     const p = prev?.[0] ? Number((prev[0].prices as number[])[index]) : null;
     if (p !== null) pts.unshift({ t: Math.floor(Date.parse(since) / 1000), p });
   }
-  const end = m.status === "resolved" && m.resolvedAt ? Math.floor(Date.parse(m.resolvedAt) / 1000) : Math.floor(Date.now() / 1000);
+  const end = (m.status === "resolved" || m.status === "cancelled") && m.resolvedAt ? Math.floor(Date.parse(m.resolvedAt) / 1000) : Math.floor(Date.now() / 1000);
   if (pts.length) pts.push({ t: Math.max(end, pts[pts.length - 1].t + 1), p: m.prices[index] ?? pts[pts.length - 1].p });
   return pts.filter((pt, i) => i === 0 || pt.t > pts[i - 1].t);
 }
@@ -124,7 +127,12 @@ export async function customTokenPrices(tokenIds: string[]): Promise<Record<stri
   const { data } = await adminClient().from("custom_markets").select("id, q, liquidity, status, winning_index").in("id", ids);
   const out: Record<string, number> = {};
   for (const r of data ?? []) {
-    const ps = r.status === "resolved" && r.winning_index !== null ? (r.q as number[]).map((_, i) => (i === r.winning_index ? 1 : 0)) : lmsrPrices((r.q as number[]).map(Number), Number(r.liquidity));
+    const ps =
+      r.status === "cancelled"
+        ? (r.q as number[]).map(() => 0) // refunded; any leftover shares are worth nothing
+        : r.status === "resolved" && r.winning_index !== null
+          ? (r.q as number[]).map((_, i) => (i === r.winning_index ? 1 : 0))
+          : lmsrPrices((r.q as number[]).map(Number), Number(r.liquidity));
     ps.forEach((p, i) => (out[`custom:${r.id}:${i}`] = p));
   }
   return out;

@@ -4,7 +4,7 @@ import { adminClient } from "@/lib/supabase/admin";
 export type ActivityItem = {
   id: number;
   displayName: string;
-  kind: "buy" | "sell" | "payout";
+  kind: "buy" | "sell" | "payout" | "refund";
   outcomeName: string;
   label: string;
   eventTitle: string;

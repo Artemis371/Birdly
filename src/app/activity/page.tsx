@@ -18,6 +18,13 @@ function ago(iso: string, now: number): string {
 }
 
 function Line({ a }: { a: ActivityItem }) {
+  if (a.kind === "refund") {
+    return (
+      <>
+        <span className="font-semibold">{a.displayName}</span> got {usd(a.amount)} back (market cancelled)
+      </>
+    );
+  }
   if (a.kind === "payout") {
     const won = a.price >= 1;
     const split = a.price > 0 && a.price < 1;

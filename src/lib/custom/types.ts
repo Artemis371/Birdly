@@ -1,5 +1,5 @@
 // Shared (client-safe) types for custom "Leahys" markets.
-export type CustomStatus = "draft" | "open" | "resolved";
+export type CustomStatus = "draft" | "open" | "resolved" | "cancelled";
 
 export type CustomMarket = {
   id: string;
@@ -15,6 +15,7 @@ export type CustomMarket = {
   winningIndex: number | null;
   publishedAt: string | null;
   resolvedAt: string | null;
+  cancelledAt: string | null;
   notifySentAt: string | null;
   prices: number[];
   ended: boolean; // past end date

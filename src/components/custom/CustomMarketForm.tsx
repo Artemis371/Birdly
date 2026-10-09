@@ -2,17 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { customMarketTimeZone } from "@/config/site";
 import { costToMove } from "@/lib/lmsr/lmsr";
+import { formatInZone, isoToZonedInput, zonedInputToIso } from "@/lib/tz";
 import type { CustomMarket } from "@/lib/custom/types";
 import { DEFAULT_LIQUIDITY } from "@/lib/custom/validate";
 import { usd } from "@/lib/format";
 
-// datetime-local works in the admin's local time zone.
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+// End dates are entered and shown in the configured zone (Hawaii by default),
+// no matter what time zone the admin's device is in.
+const TZ = customMarketTimeZone.zone;
 
 export function CustomMarketForm({ market }: { market?: CustomMarket }) {
   const locked = !!market?.hasTrades; // only description + end date editable
@@ -20,13 +19,14 @@ export function CustomMarketForm({ market }: { market?: CustomMarket }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<{ text: string; field?: string } | null>(null);
   const b = Number(liquidity) || DEFAULT_LIQUIDITY;
+  const [endLocal, setEndLocal] = useState(market ? isoToZonedInput(market.endAt, TZ) : "");
+  const endIso = endLocal ? zonedInputToIso(endLocal, TZ) : null;
   const submitMode = useRef<"save" | "publish">("save");
   const router = useRouter();
 
   async function submit(e: React.FormEvent<HTMLFormElement>, mode: "save" | "publish") {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
-    const endLocal = String(fd.get("endAt") ?? "");
     const body = {
       action: mode,
       publish: mode === "publish",
@@ -35,7 +35,7 @@ export function CustomMarketForm({ market }: { market?: CustomMarket }) {
       description: fd.get("description"),
       rules: fd.get("rules"),
       outcomes: String(fd.get("outcomes") ?? "").split("\n"),
-      endAt: endLocal ? new Date(endLocal).toISOString() : "",
+      endAt: endIso ?? "",
       liquidity: fd.get("liquidity"),
     };
     if (mode === "publish" && !window.confirm("Publish now? Trading opens immediately at equal odds.")) return;
@@ -92,8 +92,11 @@ export function CustomMarketForm({ market }: { market?: CustomMarket }) {
         {err("outcomes")}
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium" htmlFor="endAt">End date <span className="text-muted">(your local time; trading closes then)</span></label>
-        <input id="endAt" name="endAt" type="datetime-local" defaultValue={market ? toLocalInput(market.endAt) : ""} className={input} />
+        <label className="mb-1 block text-sm font-medium" htmlFor="endAt">
+          End date <span className="text-muted">({customMarketTimeZone.label}, {endIso ? formatInZone(endIso, TZ).split(" ").pop() : TZ}; trading closes then)</span>
+        </label>
+        <input id="endAt" name="endAt" type="datetime-local" value={endLocal} onChange={(e) => setEndLocal(e.target.value)} className={input} />
+        {endIso ? <p className="mt-1 text-xs text-muted">Closes {formatInZone(endIso, TZ)}</p> : null}
         {err("endAt")}
       </div>
       <div>

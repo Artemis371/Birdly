@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CustomMarketView } from "@/components/custom/CustomMarketView";
-import { customTab } from "@/config/site";
+import { customMarketTimeZone, customTab } from "@/config/site";
+import { formatInZone } from "@/lib/tz";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getCustomBySlug } from "@/lib/custom/markets";
 import { customConditionId } from "@/lib/custom/types";
@@ -34,6 +35,10 @@ export default async function CustomMarketPage(props: PageProps<"/leahys/[slug]"
         <div className="mt-1 flex flex-wrap gap-x-3 text-xs text-muted">
           <span>{compactUsd(market.volume)} traded</span>
           {ends ? <span>{ends}</span> : null}
+          <span>
+            {market.ended ? "Ended" : "Ends"} {formatInZone(market.endAt, customMarketTimeZone.zone)}
+          </span>
+          {market.status === "cancelled" ? <span className="text-warn">Cancelled</span> : null}
           <span>{market.outcomes.length} outcomes</span>
         </div>
       </header>
