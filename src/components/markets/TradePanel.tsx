@@ -169,7 +169,7 @@ export function TradePanel({ slug, market, live, outcomeIndex, onOutcome, blocke
 
       <div className="mt-4 flex items-end justify-between">
         <label className="block text-xs text-muted" htmlFor="amount">
-          {mode === "buy" ? "Amount (paper $)" : "Shares to sell"}
+          {mode === "buy" ? `Amount (paper $, max ${usd(trading.maxTradeUsd, { cents: false })})` : "Shares to sell"}
         </label>
         {mode === "sell" && viewer.loggedIn ? (
           <span className="text-xs text-muted">
@@ -189,7 +189,9 @@ export function TradePanel({ slug, market, live, outcomeIndex, onOutcome, blocke
           inputMode="decimal"
           value={amount}
           onChange={(e) => {
-            setAmount(e.target.value.replace(/[^\d.]/g, ""));
+            const v = e.target.value.replace(/[^\d.]/g, "");
+            // Buys can't exceed the per-trade maximum.
+            setAmount(mode === "buy" && Number(v) > trading.maxTradeUsd ? String(trading.maxTradeUsd) : v);
             setMessage(null);
           }}
           placeholder="0"
@@ -199,7 +201,7 @@ export function TradePanel({ slug, market, live, outcomeIndex, onOutcome, blocke
       {mode === "buy" ? (
         <div className="mt-2 flex gap-1.5">
           {[10, 50, 100, 500].map((n) => (
-            <button key={n} onClick={() => setAmount(String((Number(amount) || 0) + n))} className="flex-1 rounded-lg bg-surface-2 py-1.5 text-xs font-medium text-muted hover:text-text">
+            <button key={n} onClick={() => setAmount(String(Math.min(trading.maxTradeUsd, (Number(amount) || 0) + n)))} className="flex-1 rounded-lg bg-surface-2 py-1.5 text-xs font-medium text-muted hover:text-text">
               +${n}
             </button>
           ))}

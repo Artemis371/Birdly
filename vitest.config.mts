@@ -8,5 +8,6 @@ export default defineConfig({
       "server-only": fileURLToPath(new URL("./src/test/server-only-stub.ts", import.meta.url)),
     },
   },
-  test: { include: ["src/**/*.test.ts"] },
+  // In-memory Postgres tests can be slow when many run in parallel.
+  test: { include: ["src/**/*.test.ts"], testTimeout: 30_000 },
 });

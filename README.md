@@ -167,7 +167,16 @@ Lets the admin add an outcome to a live market. Copy
 `supabase/migrations/0005_add_outcome.sql` from the **Raw** view on GitHub,
 paste into the SQL Editor, **Run**. Safe to re-run.
 
-### 4. Reminder emails (Resend)
+### 4. Run migration 0006
+
+Makes the database itself refuse any buy or sell over the per-trade maximum
+($2,000), as a backstop to the app's own cap. Copy
+`supabase/migrations/0006_max_trade_guard.sql` from the **Raw** view on
+GitHub, paste into the SQL Editor, **Run**. Safe to re-run. If you ever change
+`maxTradeUsd` in `src/config/site.ts`, also run
+`update public.app_settings set value = <new max> where key = 'max_trade_usd';`
+
+### 5. Reminder emails (Resend)
 
 When a Leahys market passes its end date, trading closes and the daily cron
 emails you once, with a link straight to its resolve page.

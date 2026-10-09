@@ -113,7 +113,7 @@ describe("execute_trade", () => {
   });
 
   it("can spend exactly the whole balance, never below zero", async () => {
-    await trade(db, alice, "buy", 25000, 10000, 0.4);
+    for (let k = 0; k < 5; k++) await trade(db, alice, "buy", 5000, 2000, 0.4); // 5 x the $2,000 max
     expect(await cash(db, alice)).toBe(0);
     await expect(trade(db, alice, "buy", 1, 0.01, 0.01)).rejects.toThrow(/insufficient_funds/);
   });

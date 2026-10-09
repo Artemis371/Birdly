@@ -6,7 +6,7 @@ import { LIMITS, allow } from "@/lib/rate-limit";
 import { adminClient } from "@/lib/supabase/admin";
 import type { TradeDeps } from "./execute";
 
-const KNOWN = new Set(["insufficient_funds", "insufficient_shares", "account_inactive", "market_resolved", "invalid_market", "invalid_amount", "no_balance"]);
+const KNOWN = new Set(["trade_too_large", "insufficient_funds", "insufficient_shares", "account_inactive", "market_resolved", "invalid_market", "invalid_amount", "no_balance"]);
 
 export async function currentSeasonId(): Promise<number> {
   const { data } = await adminClient().from("seasons").select("id").eq("is_current", true).single();

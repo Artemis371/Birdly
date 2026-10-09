@@ -48,6 +48,7 @@ export type QuoteResponse = { quote: Extract<Quote, { ok: true }>; token: string
 
 const ERRORS: Record<string, string> = {
   insufficient_funds: "Not enough paper cash for that.",
+  trade_too_large: "That's over the per-trade maximum.",
   insufficient_shares: "You don't have that many shares to sell.",
   account_inactive: "Your account is deactivated.",
   market_resolved: "This market has already resolved.",
