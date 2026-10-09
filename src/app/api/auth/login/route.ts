@@ -12,7 +12,19 @@ export async function POST(req: Request) {
   const body = await readJson(req);
   const email = normalizeEmail(body.email);
   const password = typeof body.password === "string" ? body.password : "";
-  if (!email || !password) return json({ error: "Enter your email and password." }, { status: 400 });
+  if (!email) {
+    const typed = typeof body.email === "string" ? body.email.trim() : "";
+    return json(
+      {
+        error: typed
+          ? "That doesn't look like an email address. If your browser autofilled it, it may have put your display name here. Type your email instead."
+          : "Enter your email.",
+        field: "email",
+      },
+      { status: 400 },
+    );
+  }
+  if (!password) return json({ error: "Enter your password.", field: "password" }, { status: 400 });
 
   const [ipOk, emailOk] = await Promise.all([
     allow("login-ip", clientIp(req), LIMITS.loginPerIp),

@@ -60,6 +60,9 @@ export function Form({ fields, endpoint, submitLabel, onSuccess, footer }: Props
             autoComplete={f.autoComplete}
             placeholder={f.placeholder}
             defaultValue={f.defaultValue}
+            autoCapitalize={f.type === "email" || f.type === "password" ? "none" : undefined}
+            autoCorrect={f.type === "email" || f.type === "password" ? "off" : undefined}
+            spellCheck={f.type === "email" || f.type === "password" ? false : undefined}
             aria-invalid={error?.field === f.name}
             className={`w-full rounded-xl border bg-bg px-3 py-2.5 text-[16px] outline-none focus:border-accent ${
               error?.field === f.name ? "border-no" : "border-line"

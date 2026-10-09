@@ -14,7 +14,7 @@ export function LoginForm({ next }: { next: string }) {
       submitLabel="Log in"
       onSuccess={() => go(next)}
       fields={[
-        { name: "email", label: "Email", type: "email", autoComplete: "email" },
+        { name: "email", label: "Email", type: "email", autoComplete: "username" },
         { name: "password", label: "Password", type: "password", autoComplete: "current-password" },
       ]}
       footer={
@@ -38,9 +38,9 @@ export function SignupForm({ next }: { next: string }) {
       submitLabel="Create account"
       onSuccess={() => go(next)}
       fields={[
-        { name: "inviteCode", label: "Invite code", autoComplete: "off", hint: "Get this from whoever invited you." },
+        { name: "inviteCode", label: "Invite code", autoComplete: "one-time-code", hint: "Get this from whoever invited you." },
         { name: "displayName", label: "Display name", autoComplete: "nickname", hint: "3 to 20 characters. This is what everyone sees." },
-        { name: "email", label: "Email", type: "email", autoComplete: "email", hint: "Never shown to anyone else." },
+        { name: "email", label: "Email", type: "email", autoComplete: "username", hint: "Never shown to anyone else. This is what you log in with." },
         { name: "password", label: "Password", type: "password", autoComplete: "new-password", hint: "At least 8 characters, letters plus numbers or symbols." },
       ]}
       footer={
