@@ -13,7 +13,7 @@ Birdly never places real orders.
 | 1 | Market browsing, market page, live prices, charts (no auth) | Done |
 | 2 | Auth (invite code), balances, buying/selling, portfolio, admin | Done |
 | 3 | Automatic resolution and payouts | Done |
-| 4 | Leaderboard, activity feed, Leahys custom markets, polish | **Ready to test** |
+| 4 | Leaderboard, activity feed, Leahys custom markets, polish | Done |
 
 ## Change the brand in one place
 

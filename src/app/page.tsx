@@ -4,7 +4,7 @@ import { EventCard, cardTokenIds } from "@/components/markets/EventCard";
 import { CustomMarketCard } from "@/components/custom/CustomMarketCard";
 import { categories, customTab } from "@/config/site";
 import { getCurrentUser } from "@/lib/auth/session";
-import { listPublishedCustom } from "@/lib/custom/markets";
+import { countCustomDrafts, listPublishedCustom } from "@/lib/custom/markets";
 import type { CustomMarket } from "@/lib/custom/types";
 import { SORTS, type SortKey, getBooks, listEvents, searchEvents, type EventPage } from "@/lib/polymarket/api";
 import type { Fetched, OrderBook } from "@/lib/polymarket/types";
@@ -31,10 +31,11 @@ export default async function Home(props: PageProps<"/">) {
   const showCustom = !q && !!user && tag === customTab.slug;
   const chips = user ? [categories[0], { label: customTab.label, slug: customTab.slug }, ...categories.slice(1)] : [...categories];
 
-  if (showCustom) {
+  if (showCustom && user) {
     let custom: CustomMarket[] | null = null;
+    let drafts = 0;
     try {
-      custom = await listPublishedCustom();
+      [custom, drafts] = await Promise.all([listPublishedCustom(), user.isAdmin ? countCustomDrafts() : Promise.resolve(0)]);
     } catch {
       custom = null;
     }
@@ -42,10 +43,22 @@ export default async function Home(props: PageProps<"/">) {
       <div>
         <Chips chips={chips} active={tag} />
         <p className="mb-4 text-sm text-muted">Our own private markets. Only members can see these.</p>
+        {user.isAdmin ? (
+          <Link
+            href="/admin/leahys"
+            className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 text-sm"
+          >
+            <span>
+              <span className="font-semibold text-accent">Admin:</span>{" "}
+              {drafts ? `${drafts} draft${drafts === 1 ? "" : "s"} not published yet.` : "Create, publish and resolve these markets."}
+            </span>
+            <span className="shrink-0 font-semibold text-accent">Manage {customTab.label} markets →</span>
+          </Link>
+        ) : null}
         {!custom ? (
           <ErrorPanel title="Couldn't load these right now">Try again in a minute.</ErrorPanel>
         ) : custom.length === 0 ? (
-          <ErrorPanel title="No markets here yet">{user?.isAdmin ? "Create or publish one from the Admin page." : "Check back soon."}</ErrorPanel>
+          <ErrorPanel title="No markets here yet">{user.isAdmin ? "Publish a draft with the link above and it shows up here." : "Check back soon."}</ErrorPanel>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {custom.map((m) => (

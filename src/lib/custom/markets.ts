@@ -137,3 +137,8 @@ export async function customTokenPrices(tokenIds: string[]): Promise<Record<stri
   }
   return out;
 }
+
+export async function countCustomDrafts(): Promise<number> {
+  const { count } = await adminClient().from("custom_markets").select("id", { count: "exact", head: true }).eq("status", "draft");
+  return count ?? 0;
+}

@@ -16,6 +16,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: site.colors.bg, width: "device-width", initialScale: 1 };
 
+// Short commit id of this deployment (set by Vercel), so it's easy to tell
+// which version you're looking at.
+const BUILD = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "";
+
 // Brand colors from the config file, exposed as CSS variables.
 const c = site.colors;
 const themeVars = `:root{--accent:${c.accent};--accent-strong:${c.accentStrong};--yes:${c.yes};--no:${c.no};--bg:${c.bg};--surface:${c.surface};--surface-2:${c.surface2};--border:${c.border};--text:${c.text};--muted:${c.muted};--warn:${c.warn}}`;
@@ -36,7 +40,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <span>
               {site.name} · Paper money only. Nothing here is real money or financial advice.
             </span>
-            <span>{site.dataCredit}</span>
+            <span>
+              {site.dataCredit}
+              {BUILD ? <span className="ml-2 opacity-60">build {BUILD}</span> : null}
+            </span>
           </div>
         </footer>
       </body>
