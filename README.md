@@ -99,7 +99,7 @@ previews then use the same database).
 | `SUPABASE_SECRET_KEY` | Supabase -> Project Settings -> **API Keys**: Secret key (`sb_secret_...`; create one if none exists). The legacy `service_role` key also works. | **Yes. Mark it Sensitive. It only ever lives in Vercel.** |
 | `INVITE_CODE` | You make it up. Use something long-ish, like three random words. Not case-sensitive. | Yes |
 | `ADMIN_EMAILS` | Your email (comma-separate to add more admins). | No |
-| `SITE_URL` | Your production URL, e.g. `https://birdly.vercel.app` (no trailing slash). | No |
+| `SITE_URL` | **Production only:** your production URL, e.g. `https://birdly.vercel.app` (no trailing slash). Leave it unset for Preview; previews use their own branch URL automatically. | No |
 
 None of these use the `NEXT_PUBLIC_` prefix, so none are sent to browsers.
 After adding them, **redeploy** (Deployments -> ... -> Redeploy) so they take effect.

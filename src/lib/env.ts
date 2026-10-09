@@ -18,10 +18,16 @@ export const env = {
       .split(",")
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean),
-  // Public base URL, used in password-reset links. Falls back to Vercel's.
-  siteUrl: () =>
-    process.env.SITE_URL?.replace(/\/$/, "") ??
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
+  // Public base URL for links Birdly generates (admin reset links). Set
+  // SITE_URL for Production only; previews then use their own branch URL.
+  siteUrl: () => {
+    if (process.env.SITE_URL && process.env.VERCEL_ENV !== "preview") return process.env.SITE_URL.replace(/\/$/, "");
+    const host =
+      process.env.VERCEL_ENV === "preview"
+        ? (process.env.VERCEL_BRANCH_URL ?? process.env.VERCEL_URL)
+        : process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    return host ? `https://${host}` : (process.env.SITE_URL?.replace(/\/$/, "") ?? "http://localhost:3000");
+  },
 };
 
 export function isConfigured(): boolean {
