@@ -56,8 +56,10 @@ changed order signing/collateral; read paths are unchanged. **[docs]**
   - Gotcha: "new" and "ending soon" are flooded by 5-minute crypto
     up/down markets tagged `hide-from-new` (tag id `102169`); exclude it.
 - `GET /events/slug/{slug}` **[LIVE]** returns one event; unknown slug gives 404.
-- `GET /markets/keyset?condition_ids=...&closed=true` **[LIVE]** looks up by condition id
-  (needs `closed=true` to find resolved ones).
+- `GET /markets/keyset?condition_ids=A&condition_ids=B&closed=true` **[LIVE]** looks up
+  by condition id. Repeat the parameter; a comma-separated list returns nothing.
+  Without `closed=true` Gamma silently returns only OPEN markets, so the
+  resolution job asks twice (closed=true, then closed=false).
 - `GET /public-search?q=&limit_per_type=&events_status=active` **[LIVE]** returns
   `{ events: [...with markets], pagination: { hasMore, totalResults } }`.
 - `GET /tags/slug/{slug}` **[LIVE]**. Category slugs verified to exist: `politics`,

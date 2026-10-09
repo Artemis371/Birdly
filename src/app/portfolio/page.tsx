@@ -6,6 +6,7 @@ import { EventThumb } from "@/components/markets/EventThumb";
 import { getCurrentUser } from "@/lib/auth/session";
 import { cents, shares, usd } from "@/lib/format";
 import { loadPortfolio } from "@/lib/portfolio";
+import { resolveForUser } from "@/lib/resolution/server";
 
 // Per-request: depends on the signed-in user.
 export const dynamic = "force-dynamic";
@@ -26,10 +27,19 @@ function Signed({ v, pct }: { v: number; pct?: number | null }) {
 export default async function PortfolioPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/portfolio");
+  // Lazy resolution: pay out any of this user's markets that have resolved,
+  // so payouts show up even if the daily cron hasn't run yet.
+  const resolution = await resolveForUser(user.id);
   const p = await loadPortfolio(user.id);
 
   return (
     <div className="space-y-4">
+      {resolution?.paid.length ? (
+        <div role="status" className="rounded-xl border border-yes/40 bg-yes/10 px-4 py-3 text-sm text-yes">
+          {resolution.paid.length === 1 ? "A market you held just resolved" : `${resolution.paid.length} markets you held just resolved`} and paid out. See Trade history below.
+        </div>
+      ) : null}
+
       {p.pricesStale ? (
         <div role="status" className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn">
           Live prices are delayed, so position values may be out of date.
@@ -105,13 +115,20 @@ export default async function PortfolioPage() {
           <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
             {p.trades.map((t) => (
               <li key={t.id} className="flex items-center gap-3 px-4 py-3 text-sm">
-                <span className={`w-12 shrink-0 text-xs font-semibold uppercase ${t.kind === "buy" ? "text-accent" : t.kind === "sell" ? "text-warn" : "text-yes"}`}>{t.kind}</span>
+                <span
+                  className={`w-12 shrink-0 text-xs font-semibold uppercase ${
+                    t.kind === "buy" ? "text-accent" : t.kind === "sell" ? "text-warn" : t.price >= 1 ? "text-yes" : t.price > 0 ? "text-muted" : "text-no"
+                  }`}
+                >
+                  {t.kind === "payout" ? (t.price >= 1 ? "won" : t.price > 0 ? "split" : "lost") : t.kind}
+                </span>
                 <Link href={`/event/${t.eventSlug}`} className="min-w-0 flex-1">
                   <div className="truncate">
                     {t.outcomeName} · {t.label}
                   </div>
                   <div className="text-xs text-muted">
-                    {shares(t.shares)} sh @ {cents(t.price)} · {new Date(t.createdAt).toLocaleString()}
+                    {t.kind === "payout" ? `${shares(t.shares)} sh resolved at ${usd(t.price)} each` : `${shares(t.shares)} sh @ ${cents(t.price)}`} ·{" "}
+                    {new Date(t.createdAt).toLocaleString()}
                   </div>
                 </Link>
                 <span className="tabular shrink-0">{t.kind === "buy" ? "−" : "+"}{usd(t.amount)}</span>

@@ -11,8 +11,8 @@ Birdly never places real orders.
 | Phase | What | State |
 |---|---|---|
 | 1 | Market browsing, market page, live prices, charts (no auth) | Done |
-| 2 | Auth (invite code), balances, buying/selling, portfolio, admin | **Ready to test** |
-| 3 | Automatic resolution and payouts | Not started |
+| 2 | Auth (invite code), balances, buying/selling, portfolio, admin | Done |
+| 3 | Automatic resolution and payouts | **Ready to test** |
 | 4 | Leaderboard, activity feed, polish, deploy | Not started |
 
 ## Change the brand in one place
@@ -110,6 +110,38 @@ After adding them, **redeploy** (Deployments -> ... -> Redeploy) so they take ef
    **the email you put in `ADMIN_EMAILS`**, and a password.
 2. You'll see **Admin** in the top bar. Share the invite code with your group.
 
+## Setup (Phase 3: resolution and payouts)
+
+### 1. Run migration 0002
+
+1. On GitHub, open `supabase/migrations/0002_resolution.sql` and click **Raw**
+   (copying from the normal GitHub view can pick up stray characters).
+2. Supabase -> **SQL Editor** -> **New query** -> paste the whole file -> **Run**.
+3. It's safe to run more than once.
+
+### 2. Add `CRON_SECRET` in Vercel
+
+| Name | Value | Secret? |
+|---|---|---|
+| `CRON_SECRET` | A long random string (32+ characters; a password manager's generator is fine). | **Yes. Mark it Sensitive.** |
+
+Add it for **Production** (Vercel only runs cron jobs on production
+deployments). Vercel automatically sends it with each cron call; the endpoint
+refuses every request if it's missing or wrong. Redeploy after adding it.
+
+The schedule lives in `vercel.json`: once a day at 08:17 UTC (Vercel's free
+plan allows one run per day and may start it anytime within that hour).
+
+### 3. How to test it
+
+- **Admin -> Waiting to pay out -> Check now** runs the same resolution step
+  as the cron, on any deployment, previews included.
+- Opening **Portfolio** also checks your own markets (at most once every 5
+  minutes per market).
+- To trigger the real cron endpoint by hand on production:
+  `curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://YOUR-SITE/api/cron/daily`
+- Vercel -> project -> **Settings -> Cron Jobs** shows the job and lets you run it.
+
 ## Run it locally
 
 Requires Node 20.9+ (tested on Node 22).
@@ -158,6 +190,27 @@ npm run build
 - **Sessions** persist via Supabase refresh-token cookies, refreshed by
   `src/proxy.ts`, so phones stay logged in.
 
+## How resolution and payouts work
+
+- **One shared step** (`src/lib/resolution/`) runs from the daily cron, from
+  portfolio page loads (only that user's markets, throttled, 4-second cap),
+  and from the admin **Check now** button.
+- It looks at every market someone still holds that hasn't been paid, asks
+  Gamma for its status, and only if Gamma says resolved asks the CLOB too.
+- **Pays only when all of these hold** (rule from the live checks in
+  `docs/API_NOTES.md`): Gamma says closed and `resolved`/`settled`; final
+  prices exist for every outcome, are each 0, 0.5 or 1, and sum to 1; the CLOB
+  is closed, agrees on every price, and flags the winner (nobody on a 50/50).
+  Proposed, disputed, missing, unusual or disagreeing data means **wait**, and
+  the reason shows on the admin page.
+- **Payout:** each open share gets its final price ($1 / $0, or $0.50 / $0.50),
+  rounded down to the cent, credited in one database transaction that also
+  zeroes the position and logs a "won"/"lost"/"split" row in trade history.
+- **Idempotent:** `resolve_market` locks the market row and refuses to pay a
+  market twice, so the cron, a portfolio load and the admin button can all run
+  at the same moment safely.
+- The cron also records a daily account-value snapshot for every member.
+
 ## How it works (market data)
 
 - **The browser never calls Polymarket.** Pages and `/api/*` routes call
@@ -188,7 +241,11 @@ src/lib/trading/quote.ts      order-book walking math (buy/sell/caps/rounding)
 src/lib/trading/execute.ts    quote -> confirm -> execute rules (fresh price, tolerance, single-use)
 src/lib/auth/                 signup, session, validation, admin/rate-limit guards
 supabase/migrations/          SQL to paste into the Supabase SQL editor
-src/test/db.test.ts           runs the real migration in PGlite: atomic signup, trades, RLS
+src/lib/resolution/           payout rule (decide.ts) + shared resolution step (run.ts)
+src/app/api/cron/daily/       daily cron: resolution + snapshots (needs CRON_SECRET)
+src/test/db.test.ts           runs the real migrations in PGlite: atomic signup, trades, RLS
+src/test/resolution.db.test.ts  payouts, 50/50, double resolution, re-running 0002
+src/test/live-resolution.test.ts  opt-in live check: LIVE=1 npx vitest run src/test/live-resolution.test.ts
 src/app/                      pages and /api routes
 src/components/               UI (cards, chart, trade panel, logo)
 ```

@@ -42,3 +42,52 @@ export async function listUsers(): Promise<AdminUserRow[]> {
     })
     .sort((a, b) => a.joinedAt.localeCompare(b.joinedAt));
 }
+
+export type WaitingMarket = {
+  conditionId: string;
+  label: string;
+  eventTitle: string;
+  eventSlug: string;
+  endDate: string | null;
+  closed: boolean;
+  lastCheckedAt: string | null;
+  note: string | null;
+  holders: number;
+  shares: number;
+};
+
+// Markets someone still holds that haven't been paid out, for the admin
+// "waiting" view. Closed or past-end-date ones are the ones that could be stuck.
+export async function listWaitingMarkets(): Promise<WaitingMarket[]> {
+  const db = adminClient();
+  const { data: pos } = await db.from("positions").select("condition_id, user_id, shares").gt("shares", 0).limit(5000);
+  const byMarket = new Map<string, { users: Set<string>; shares: number }>();
+  for (const p of pos ?? []) {
+    const e = byMarket.get(p.condition_id) ?? { users: new Set<string>(), shares: 0 };
+    e.users.add(p.user_id);
+    e.shares += Number(p.shares);
+    byMarket.set(p.condition_id, e);
+  }
+  if (!byMarket.size) return [];
+  const { data: markets } = await db
+    .from("markets")
+    .select("condition_id, label, event_title, event_slug, end_date, polymarket_closed, last_checked_at, resolution_note")
+    .is("resolved_at", null)
+    .in("condition_id", [...byMarket.keys()].slice(0, 500));
+  const now = Date.now();
+  return (markets ?? [])
+    .filter((m) => m.polymarket_closed || (m.end_date && Date.parse(m.end_date) < now))
+    .map((m) => ({
+      conditionId: m.condition_id,
+      label: m.label,
+      eventTitle: m.event_title,
+      eventSlug: m.event_slug,
+      endDate: m.end_date,
+      closed: m.polymarket_closed,
+      lastCheckedAt: m.last_checked_at,
+      note: m.resolution_note,
+      holders: byMarket.get(m.condition_id)?.users.size ?? 0,
+      shares: byMarket.get(m.condition_id)?.shares ?? 0,
+    }))
+    .sort((a, b) => Number(b.closed) - Number(a.closed) || (a.endDate ?? "").localeCompare(b.endDate ?? ""));
+}

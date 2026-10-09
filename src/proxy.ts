@@ -26,5 +26,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Skip static assets and the public market-data APIs.
-  matcher: ["/((?!_next/static|_next/image|brand/|api/event/|api/history|api/quote|api/health/).*)"],
+  matcher: ["/((?!_next/static|_next/image|brand/|api/event/|api/history|api/quote|api/health/|api/cron/).*)"],
 };

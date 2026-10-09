@@ -1,8 +1,8 @@
 import "server-only";
 import { cacheTtl } from "@/config/site";
 import { CLOB, GAMMA, cached, getJson } from "./client";
-import { parseBook, parseClobMarket, parseEvent, parseHistory } from "./parse";
-import type { ChartRange, ClobMarket, Fetched, OrderBook, PolyEvent, PricePoint } from "./types";
+import { parseBook, parseClobMarket, parseEvent, parseHistory, parseMarket } from "./parse";
+import type { ChartRange, ClobMarket, Fetched, Market, OrderBook, PolyEvent, PricePoint } from "./types";
 
 // Every Polymarket endpoint and query parameter Birdly uses lives in this file,
 // all verified against live responses on 2026-10-09 (see docs/API_NOTES.md).
@@ -147,4 +147,33 @@ export function getClobMarket(conditionId: string): Promise<Fetched<ClobMarket |
   return cached(`clob-market:${conditionId}`, cacheTtl.event, async () =>
     parseClobMarket((await getJson(`${CLOB}/markets/${encodeURIComponent(conditionId)}`)) as Raw),
   );
+}
+
+// Fresh (uncached) lookups for resolution. Live behavior: condition_ids must be
+// repeated (comma-separated returns nothing), and Gamma only returns open
+// markets unless closed=true, so ask for both.
+export async function fetchGammaMarketsByCondition(conditionIds: string[]): Promise<Map<string, Market>> {
+  const out = new Map<string, Market>();
+  for (let i = 0; i < conditionIds.length; i += 40) {
+    const chunk = conditionIds.slice(i, i + 40);
+    for (const closed of ["true", "false"]) {
+      const sp = new URLSearchParams({ closed, limit: "100" });
+      for (const id of chunk) sp.append("condition_ids", id);
+      const raw = (await getJson(`${GAMMA}/markets/keyset?${sp}`)) as Raw;
+      for (const r of (Array.isArray(raw.markets) ? raw.markets : []) as Raw[]) {
+        const m = parseMarket(r);
+        if (m) out.set(m.conditionId, m);
+      }
+    }
+  }
+  return out;
+}
+
+export async function fetchClobMarket(conditionId: string): Promise<ClobMarket | null> {
+  try {
+    return parseClobMarket((await getJson(`${CLOB}/markets/${encodeURIComponent(conditionId)}`)) as Raw);
+  } catch (err) {
+    if ((err as { status?: number }).status === 404) return null;
+    throw err;
+  }
 }
