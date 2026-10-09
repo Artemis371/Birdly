@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
-import { Wordmark } from "@/components/brand/Logo";
+import { Nav } from "@/components/Nav";
 import { site } from "@/config/site";
 import "./globals.css";
 
@@ -29,16 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col">
         <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
-          <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-            <Link href="/" aria-label={`${site.name} home`}>
-              <Wordmark />
-            </Link>
-            <div className="flex items-center gap-1 text-sm">
-              <Link href="/" className="rounded-lg px-3 py-2 text-muted hover:bg-surface hover:text-text">
-                Markets
-              </Link>
-            </div>
-          </nav>
+          <Nav />
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-4">{children}</main>
         <footer className="border-t border-line">

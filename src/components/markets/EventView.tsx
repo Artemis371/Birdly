@@ -6,14 +6,25 @@ import { refresh } from "@/config/site";
 import { cents, compactUsd, pct } from "@/lib/format";
 import { marketBlockReason, orderMarkets, type LiveMarket, type LiveResponse } from "@/lib/polymarket/display";
 import type { PolyEvent } from "@/lib/polymarket/types";
+import type { Holder } from "@/lib/holders";
+import { shares as fmtShares } from "@/lib/format";
 import { PriceChart } from "./PriceChart";
 import { TradePanel } from "./TradePanel";
 
 const INITIAL_ROWS = 12;
 
-type Props = { ev: PolyEvent; initialLive: LiveResponse | null; initialMarketId?: string; initialSide?: "yes" | "no" };
+export type Viewer = { loggedIn: false } | { loggedIn: true; cash: number; holdings: Record<string, number> };
 
-export function EventView({ ev, initialLive, initialMarketId, initialSide }: Props) {
+type Props = {
+  ev: PolyEvent;
+  initialLive: LiveResponse | null;
+  initialMarketId?: string;
+  initialSide?: "yes" | "no";
+  viewer: Viewer;
+  holders: Holder[];
+};
+
+export function EventView({ ev, initialLive, initialMarketId, initialSide, viewer, holders }: Props) {
   const markets = useMemo(() => orderMarkets(ev.markets, ev.negRisk), [ev]);
   const [live, setLive] = useState<LiveResponse | null>(initialLive);
   const [liveError, setLiveError] = useState(initialLive === null);
@@ -103,6 +114,8 @@ export function EventView({ ev, initialLive, initialMarketId, initialSide }: Pro
           </div>
         ) : null}
 
+        {viewer.loggedIn ? <HoldersPanel holders={holders} labels={new Map(markets.map((x) => [x.conditionId, x.label]))} multi={multi} /> : null}
+
         {ev.description ? (
           <details className="rounded-2xl border border-line bg-surface p-4 text-sm">
             <summary className="cursor-pointer font-semibold">Rules</summary>
@@ -112,7 +125,16 @@ export function EventView({ ev, initialLive, initialMarketId, initialSide }: Pro
       </div>
 
       <aside id="trade" className="lg:sticky lg:top-20 lg:self-start">
-        <TradePanel market={selected} live={liveById.get(selected.id)} outcomeIndex={outcomeIndex} onOutcome={setOutcomeIndex} blockedReason={blocked} />
+        <TradePanel
+          key={selected.id}
+          slug={ev.slug}
+          market={selected}
+          live={liveById.get(selected.id)}
+          outcomeIndex={outcomeIndex}
+          onOutcome={setOutcomeIndex}
+          blockedReason={blocked}
+          viewer={viewer}
+        />
       </aside>
     </div>
   );
@@ -138,5 +160,30 @@ function OutcomeRow({ m, live, active, onSelect }: { m: PolyEvent["markets"][num
         </button>
       </div>
     </li>
+  );
+}
+
+function HoldersPanel({ holders, labels, multi }: { holders: Holder[]; labels: Map<string, string>; multi: boolean }) {
+  return (
+    <section className="rounded-2xl border border-line bg-surface p-4">
+      <h2 className="mb-2 text-sm font-semibold">Who in the group holds this</h2>
+      {holders.length === 0 ? (
+        <p className="text-sm text-muted">Nobody yet. Be the first.</p>
+      ) : (
+        <ul className="space-y-1.5 text-sm">
+          {holders.map((h) => (
+            <li key={h.displayName + h.tokenId} className="flex items-center gap-2">
+              <span className={`min-w-0 flex-1 truncate ${h.isYou ? "font-semibold text-accent" : ""}`}>
+                {h.displayName}
+                {h.isYou ? " (you)" : ""}
+              </span>
+              {multi ? <span className="hidden max-w-[40%] truncate text-xs text-muted sm:inline">{labels.get(h.conditionId)}</span> : null}
+              <span className="tabular text-muted">{fmtShares(h.shares)} sh</span>
+              <span className="rounded-md bg-surface-2 px-2 py-0.5 text-xs font-semibold">{h.outcomeName}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -4,6 +4,8 @@ import { ErrorPanel } from "@/components/StaleBanner";
 import { EventThumb } from "@/components/markets/EventThumb";
 import { EventView } from "@/components/markets/EventView";
 import { compactUsd, timeLeft } from "@/lib/format";
+import { getCurrentUser } from "@/lib/auth/session";
+import { loadHolders } from "@/lib/holders";
 import { getBooks, getEvent } from "@/lib/polymarket/api";
 import { orderMarkets, toLive, type LiveResponse } from "@/lib/polymarket/display";
 
@@ -23,6 +25,7 @@ export default async function EventPage(props: PageProps<"/event/[slug]">) {
   const { slug } = await props.params;
   const sp = await props.searchParams;
   const m = typeof sp.m === "string" ? sp.m : undefined;
+  const c = typeof sp.c === "string" ? sp.c : undefined;
   const side = sp.side === "no" ? "no" : sp.side === "yes" ? "yes" : undefined;
 
   let ev;
@@ -47,6 +50,14 @@ export default async function EventPage(props: PageProps<"/event/[slug]">) {
     initialLive = null;
   }
 
+  // Signed-in extras: who in the group holds what, and the viewer's own shares.
+  const user = await getCurrentUser();
+  const holders = user ? await loadHolders(event.markets.map((x) => x.conditionId), user.id) : [];
+  const initialMarketId = m ?? event.markets.find((x) => x.conditionId === c)?.id;
+  const viewer = user
+    ? { loggedIn: true as const, cash: user.cash, holdings: Object.fromEntries(holders.filter((h) => h.isYou).map((h) => [h.tokenId, h.shares])) }
+    : { loggedIn: false as const };
+
   const ends = timeLeft(event.endDate);
   return (
     <div>
@@ -63,7 +74,7 @@ export default async function EventPage(props: PageProps<"/event/[slug]">) {
           </div>
         </div>
       </header>
-      <EventView ev={event} initialLive={initialLive} initialMarketId={m} initialSide={side} />
+      <EventView ev={event} initialLive={initialLive} initialMarketId={initialMarketId} initialSide={side} viewer={viewer} holders={holders} />
     </div>
   );
 }
