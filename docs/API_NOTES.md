@@ -1,243 +1,199 @@
 # Birdly API Notes
 
-Research date: 2026-10-09. Everything below should be re-checked against the
-live docs before relying on it, because Polymarket and Vercel both change
-things often (Polymarket shipped "CLOB V2" in April 2026).
+First written 2026-10-09 from Polymarket's open-source code and doc snippets;
+**re-verified the same day against live responses** from
+`gamma-api.polymarket.com` and `clob.polymarket.com`. Real captured responses
+live in `src/lib/polymarket/__fixtures__/` and the parser tests run on them.
 
-## How this was researched (read this first)
+Tags: **[LIVE]** = confirmed by real requests on 2026-10-09.
+**[code]** = from Polymarket's official client code/schemas, not exercised live.
+**[docs]** = official docs (via search snippet). **[unverified]** = still a guess.
 
-The build sandbox's network policy blocks `docs.polymarket.com`,
-`gamma-api.polymarket.com`, `clob.polymarket.com` and `vercel.com`. So I could
-NOT hit the live API or read the docs pages directly. Instead:
-
-- **Primary source:** Polymarket's own open source code, which is reachable:
-  - `Polymarket/clob-client-v2` on GitHub (`src/endpoints.ts`, `src/types/clob.ts`, `src/client.ts`)
-  - `Polymarket/py-clob-client` on GitHub (`endpoints.py`, `client.py`)
-  - `@polymarket/bindings@0.12.0` and `@polymarket/client@0.12.0` on npm (official
-    generated schemas for Gamma and CLOB responses and request params)
-- **Secondary:** web search snippets of docs.polymarket.com and vercel.com pages.
-- **Tertiary (flagged where used):** third party guides.
-
-Confidence tags used below: **[code]** = confirmed in Polymarket's official
-code/schemas, **[docs-snippet]** = from official docs via search snippet,
-**[3rd-party]** = community source, treat as unverified.
-
-To let me test against the real API while building, add these hosts to the
-cloud environment's allowed domains: `gamma-api.polymarket.com`,
-`clob.polymarket.com`, `docs.polymarket.com`.
+Every endpoint and parameter Birdly uses is in one file:
+`src/lib/polymarket/api.ts`.
 
 ---
 
-## 1. Which APIs we use
+## What changed after live testing
+
+| Topic | What I had inferred | What the live API actually does |
+|---|---|---|
+| `GET /events`, `GET /markets` (offset paging) | Usable | **Deprecated.** Responses carry `deprecation: true`, `sunset: Fri, 01 May 2026` and `warning: 299 - "use /events/keyset"`. Birdly uses `/events/keyset` and `/markets/keyset`. |
+| `/price?side=` | Docs said BUY returns the bid | **Confirmed.** `side=BUY` = best **bid**, `side=SELL` = best **ask**. Birdly doesn't use it. |
+| `/book` order | Unknown | Both arrays sorted **worst to best** (best price is the LAST element). Birdly sorts itself. |
+| Price history 1M | Planned explicit `startTs`/`endTs` | Explicit windows **over 15 days are rejected** (`400 "'startTs' and 'endTs' interval is too long"`). `interval=1m` works and returns ~30 days. |
+| History response | Probably `{history: [...]}` | Confirmed `{ "history": [{ "t": unixSeconds, "p": number }] }`. |
+| Resolution signal | "Exactly one CLOB winner flag" | **Wrong for 50/50s.** On a 50/50 resolution BOTH tokens have `winner: false`, price 0.5. Must use status + final prices. |
+| Gamma prices | Fresh | Gamma responses are CDN-cached (`cache-control: public, max-age=300`). Gamma `bestBid/bestAsk/outcomePrices` lagged the CLOB book by about 1¢ in testing. Display uses CLOB books. |
+| Outcome names | Yes/No | Sports markets use team names (`["PARIVISION","Team Yandex"]`, `["Packers","Cowboys"]`). |
+| Placeholders | Not anticipated | Multi-outcome events include placeholder markets ("Person O", "Team H", "Other") with `active: false`, sometimes priced 0.5/0.5. Must be hidden. |
+| Timestamps | ISO | `closedTime` comes as Postgres-style `"2026-10-08 18:38:29+00"`. Normalized in parse.ts. |
+| User-Agent | Not considered | Cloudflare returned **403** to Python's default `Python-urllib` UA. curl, `node`, `undici` and a custom UA were fine. Birdly sends `Birdly/0.1 (...)`. |
+| `/books` batch | Unknown | Works with 60+ tokens. Unknown or resolved tokens are **silently dropped** and response order does **not** match request order. Key by `asset_id`. |
+| `/book` after resolution | Unknown | `404 {"error":"No orderbook exists for the requested token id"}`. |
+
+## 1. APIs and auth
 
 | API | Base URL | Used for |
 |---|---|---|
-| Gamma | `https://gamma-api.polymarket.com` | Events, markets, tags, search, resolution status |
-| CLOB | `https://clob.polymarket.com` | Order books (bid/ask + depth), price history, per-market token winner flags |
+| Gamma | `https://gamma-api.polymarket.com` | Events, markets, search, tags, resolution status |
+| CLOB | `https://clob.polymarket.com` | Order books, price history, per-market winner flags |
 
-Your assumption (Gamma for markets/events, CLOB for prices/books/history) is
-**correct**. **[code]**
+No auth on any endpoint Birdly uses. **[LIVE]** CLOB V2 (April 2026) only
+changed order signing/collateral; read paths are unchanged. **[docs]**
 
-There is also a Data API (`/v2/prices-history`, positions, etc.) that the new
-unified SDK uses, but we don't need it. **[code]**
+## 2. Gamma endpoints
 
-## 2. Auth
+- `GET /events/keyset` **[LIVE]** returns `{ "$schema", "events": [...], "next_cursor": "..." }`.
+  - Params verified: `closed=false`, `limit` (**capped at 100**), `order`,
+    `ascending`, `tag_slug`, `exclude_tag_id`, `end_date_min` (ISO),
+    `liquidity_min`, `after_cursor`.
+  - Valid `order` values verified: `volume24hr`, `volume`, `endDate`,
+    `startDate`, `createdAt`. An invalid one returns
+    `422 {"type":"validation error","error":"order fields are not valid"}`.
+  - Gotcha: `order=endDate&ascending=true` without `end_date_min` returns
+    long-expired markets that were never closed (2025 end dates).
+  - Gotcha: "new" and "ending soon" are flooded by 5-minute crypto
+    up/down markets tagged `hide-from-new` (tag id `102169`); exclude it.
+- `GET /events/slug/{slug}` **[LIVE]** returns one event; unknown slug gives 404.
+- `GET /markets/keyset?condition_ids=...&closed=true` **[LIVE]** looks up by condition id
+  (needs `closed=true` to find resolved ones).
+- `GET /public-search?q=&limit_per_type=&events_status=active` **[LIVE]** returns
+  `{ events: [...with markets], pagination: { hasMore, totalResults } }`.
+- `GET /tags/slug/{slug}` **[LIVE]**. Category slugs verified to exist: `politics`,
+  `sports`, `crypto`, `economy`, `tech`, `pop-culture` (label "Culture"), `world`,
+  `finance`, `geopolitics`. (`culture` does not exist.)
 
-All read endpoints we need are public, no API key. Auth (L1 wallet signature /
-L2 API key) is only for placing orders, cancels, balances, notifications.
-**[code]** + **[docs-snippet]**
+## 3. CLOB endpoints
 
-CLOB V2 (April 28, 2026) changed order signing, collateral (pUSD) and order
-structs. Public read paths and the host stayed the same. Since we never place
-real orders, V2 doesn't affect us. **[docs-snippet]** + **[code]**
-
-## 3. Endpoints we'll call
-
-### Gamma
-- `GET /events` with snake_case params: `closed=false`, `active=true`,
-  `order=<field>`, `ascending=false`, `tag_id=<id>`, `limit`, `offset`,
-  `end_date_min`, `end_date_max`, `liquidity_min`. **[code]** for the param
-  names (SDK maps camelCase to snake_case: `tagIds -> tag_id`,
-  `pageSize -> limit`, `cursor -> after_cursor`).
-- `GET /events/keyset` (cursor pagination via `after_cursor`, response has
-  `next_cursor`). **[code]**
-- `GET /events/slug/{slug}` and `GET /events/{id}`. **[code]**
-- `GET /markets` (same filters), `GET /markets/keyset`. **[code]**
-- `GET /public-search?q=...` (paged with `limit_per_type`, `page`). **[code]**
-- `GET /tags` for category filters. **[docs-snippet]**
-- Accepted values for `order` are **not confirmed**. `volume24hr`, `volume`,
-  `liquidity`, `endDate`, `startDate`, `createdAt` are reported by various
-  sources **[3rd-party]**. I'll verify live before relying on any of them and
-  fall back to sorting our cached list server-side.
-
-### CLOB
-- `GET /book?token_id=<id>` returns **[code]**:
-  ```ts
-  { market, asset_id, timestamp, hash,
-    bids: {price: string, size: string}[],
-    asks: {price: string, size: string}[],
-    min_order_size, tick_size, neg_risk, last_trade_price }
+- `GET /book?token_id=` **[LIVE]**:
+  ```json
+  { "market": "<conditionId>", "asset_id": "<tokenId>", "timestamp": "1791516991331",
+    "hash": "...", "bids": [{"price":"0.001","size":"2102048"}, ... best last],
+    "asks": [{"price":"0.999","size":"2105445.28"}, ... best last],
+    "min_order_size": "5", "tick_size": "0.001", "neg_risk": true, "last_trade_price": "0.239" }
   ```
-  **Gotcha:** array order is not documented and third party code reads the
-  best price from the END of the array. We will compute
-  `bestBid = max(bids.price)` and `bestAsk = min(asks.price)` and never trust
-  array position.
-- `POST /books` (batch books, body `[{token_id}]`). **[code]**
-- `GET /price?token_id=&side=BUY|SELL`. **Gotcha:** per the official docs page
-  snippet, `side=BUY` returns the best **bid** and `side=SELL` the best
-  **ask** (i.e. the price you'd get matched against, from the book's side, not
-  your side). Easy to get backwards. **We won't use `/price` for fills**;
-  we use `/book` so we also get depth. **[docs-snippet]**
-- `GET /prices-history?market=<token_id>&interval=...&fidelity=<minutes>` or
-  `&startTs=&endTs=` (unix seconds). **[code]**
-  - `market` is the **CLOB token id**, not the condition id.
-  - Official client enum: `interval` in `1h, 6h, 1d, 1w, max`. Docs snippets
-    also mention `1m` (one month) and `all`. The client requires either
-    `interval` OR both `startTs` and `endTs`.
-  - Points are `{ t: unixSeconds, p: price }`. I believe the raw response is
-    wrapped as `{ "history": [...] }` (the TS client types it as a bare array);
-    I'll handle both shapes.
-  - Birdly mapping: 1H -> `interval=1h&fidelity=1`, 1D -> `1d&fidelity=5`,
-    1W -> `1w&fidelity=30`, 1M -> `startTs/endTs` 30 days `&fidelity=180`,
-    All -> `max&fidelity=720`. Fidelity values are my choice, to tune live.
-- `GET /markets/{condition_id}` returns `tokens: [{token_id, outcome, price,
-  winner: boolean}]`, plus `active`, `closed`, `accepting_orders`,
-  `enable_order_book`. **[code]** (py client + docs snippet)
+  All numbers are strings. `timestamp` is ms. Books include huge resting
+  orders at 0.001 / 0.999.
+- `POST /books` body `[{"token_id": "..."}]` **[LIVE]**: see table above.
+- `GET /price?token_id=&side=BUY|SELL` **[LIVE]**: example on one token: BUY → `0.239`
+  (max bid 0.239), SELL → `0.248` (min ask 0.248).
+- `GET /midpoint`, `GET /spread` **[LIVE]** exist; unused.
+- `GET /prices-history?market=<tokenId>&interval=&fidelity=` **[LIVE]**:
 
-## 4. Rate limits
+  | Birdly range | Params | Live result |
+  |---|---|---|
+  | 1H | `interval=1h&fidelity=1` | ~61 points, 1 min apart |
+  | 1D | `interval=1d&fidelity=5` | ~288 points, 5 min apart |
+  | 1W | `interval=1w&fidelity=30` | ~338 points, 30 min apart |
+  | 1M | `interval=1m&fidelity=180` | ~242 points, 3 h apart, ~30 days |
+  | All | `interval=max&fidelity=720` | full history, 12 h apart |
 
-Official numbers (per 10 seconds, sliding window, enforced by Cloudflare).
-**[docs-snippet]** from `docs.polymarket.com/api-reference/rate-limits`:
+  `6h` and `all` also work. `startTs` alone (no `endTs`) works for any length.
+  Unknown token returns `200 {"history":[]}`. Resolved markets still return
+  history.
+- `GET /markets/{conditionId}` **[LIVE]**: `tokens: [{token_id, outcome, price, winner}]`,
+  plus `active`, `closed`, `accepting_orders`, `enable_order_book`, `neg_risk`.
 
-| Endpoint | Limit / 10s |
-|---|---|
-| Gamma general | 4,000 |
-| Gamma `/events` | 500 |
-| Gamma `/markets` | 300 |
-| Gamma `/public-search` | 350 |
-| Gamma `/tags` | 200 |
-| CLOB general | 9,000 |
-| CLOB `/book` | 1,500 |
-| CLOB `/books`, `/prices` | 500 |
-| CLOB `/prices-history` | 1,000 |
+## 4. Rate limits **[docs]**
 
-Over the limit, requests get **throttled (delayed/queued), not rejected**, so
-the symptom is latency, not 429s (still handle 429 with backoff).
+Per 10 s, Cloudflare-throttled (requests delay rather than fail):
+Gamma general 4,000, `/events` 500, `/markets` 300, `/public-search` 350;
+CLOB general 9,000, `/book` 1,500, `/books` 500, `/prices-history` 1,000.
+Not load-tested (no reason to with 10 users). Birdly caches in memory per
+instance and sets `Cache-Control: s-maxage` on its own API routes so
+Vercel's CDN shares responses.
 
-For 10 users this is a non issue, but we cache anyway (requirement):
-market list ~60s, order book ~3-5s for display, price history ~30-60s,
-plus a FRESH (uncached) book fetch at trade execution.
+## 5. Multi-outcome events **[LIVE]**
 
-## 5. Multi-outcome events
+An event has `markets[]`; each market is an independent binary market with its
+own `conditionId`, `clobTokenIds` (JSON string of 2 ids), `outcomes`,
+`outcomePrices` (JSON strings), and `groupItemTitle` (the candidate name).
+Example: "Nobel Peace Prize Winner 2026" has 71 markets; event has
+`negRisk: true`, `enableNegRisk: true`, `negRiskAugmented: true`.
+Sports game events mix moneyline, spread and totals markets (one NFL game had
+328 markets).
 
-An **event** contains a `markets[]` array. A multi-outcome event ("Who wins
-X?") is a bundle of independent **binary** markets, one per candidate, each
-with its own `conditionId` and its own YES/NO token pair. **[code]** +
-**[3rd-party]**
+Placeholders: `active: false, closed: false`, usually no `outcomePrices`
+(sometimes `["0.5","0.5"]`), `volume: "0"`, Gamma `bestBid 0 / bestAsk 1`.
+Birdly shows only `active && !closed` markets.
 
-Per market (Gamma) fields we use **[code]**:
-- `id`, `conditionId`, `question`, `slug`, `groupItemTitle` (the candidate
-  name inside a multi-outcome event), `endDate`, `closedTime`
-- `outcomes`, `outcomePrices`, `clobTokenIds`: **raw API returns these as
-  JSON-encoded strings** (e.g. `"[\"Yes\",\"No\"]"`); the SDK schemas parse
-  them. Must `JSON.parse`. Index-aligned: `clobTokenIds[0]` is `outcomes[0]`.
-- `active`, `closed`, `archived`, `acceptingOrders`, `enableOrderBook`
-- `negRisk` (event-level `enableNegRisk`, `negRiskAugmented`): neg-risk means
-  the outcomes are mutually exclusive and linked on-chain. Doesn't change our
-  paper math, each market still pays $1 to its winning token.
-- `bestBid`, `bestAsk`, `volume24hr`, `volume`, `liquidity` (display only;
-  never used for fills).
-- `umaResolutionStatus` enum: `requested | proposed | disputed | resolved |
-  settled`. **[code]**
+Open markets can also carry `umaResolutionStatus: "proposed"` while still
+`acceptingOrders: true` (13 seen in a 1,500-market sample). Birdly blocks
+trading on any market with a non-null resolution status.
 
-So in Birdly, "Buy YES on Candidate A" = buy token `clobTokenIds[0]` of
-Candidate A's market. Each candidate shows its own Yes/No prices.
+## 6. Resolution **[LIVE]**
 
-## 6. How resolution is reported
+Normal resolution (Gamma + CLOB, same market):
+```
+Gamma: closed: true, umaResolutionStatus: "resolved", outcomePrices: ["1","0"],
+       acceptingOrders: false, automaticallyResolved: true,
+       closedTime: "2026-10-08 18:38:29+00"
+CLOB : closed: true, accepting_orders: false,
+       tokens: [{outcome:"PARIVISION", price:1, winner:true}, {outcome:"Team Yandex", price:0, winner:false}]
+```
 
-Polymarket resolves through the UMA optimistic oracle (propose, dispute window,
-possibly dispute/vote). Winning tokens redeem for $1. **[docs-snippet]**
+50/50 resolution (`nfl-gb-dal-2025-09-28`, a tie; also `atp-arnaldi-cobolli-2026-06-05`):
+```
+Gamma: closed: true, umaResolutionStatus: "resolved", outcomePrices: ["0.5","0.5"],
+       umaResolutionStatuses: "[\"proposed\"]"
+CLOB : tokens: [{outcome:"Packers", price:0.5, winner:false}, {outcome:"Cowboys", price:0.5, winner:false}]
+```
+In a scan of the 3,000 highest-volume closed markets: 2,994 `resolved`, 6
+legacy 2020-21 markets with `null` status and near-0/1 float prices
+(e.g. `0.0000000206...`). Five 50/50s found. I found no market reporting
+`settled` or `disputed` among closed ones, and no "voided" marker distinct
+from 50/50; Polymarket's "refund" outcome appears to BE the 0.5/0.5 split.
 
-Signals available:
-1. Gamma market `closed: true` and `umaResolutionStatus === "resolved"`
-   (or `"settled"`). **[code]** for the enum, exact semantics of
-   resolved vs settled **unverified**.
-2. Gamma `outcomePrices` snaps to `["1","0"]` / `["0","1"]` after resolution.
-   Right after close it can still show trading prices, so never use it alone.
-   **[3rd-party]**
-3. CLOB `GET /markets/{conditionId}` -> `tokens[].winner === true`. **[code]**
+**Birdly payout rule (Phase 3):** pay out only when Gamma says `closed` AND
+`umaResolutionStatus` is `resolved` (or `settled`), AND the final prices are
+each in [0,1] and sum to 1 (±0.001), AND the CLOB token prices agree. Each
+share pays its final price ($1 / $0, or $0.50 / $0.50). Anything else
+(proposed, disputed, missing, disagreeing) waits for a later check.
 
-Birdly rule: **resolve only when the market is closed AND (CLOB `winner` flag
-is set on exactly one token OR `umaResolutionStatus` is resolved/settled with
-outcomePrices exactly 1/0)**. Disputed / proposed / ambiguous -> wait.
+## 7. Terms / display
 
-**Edge case: 50/50 or voided markets.** Some markets resolve to a split
-(outcomePrices like `["0.5","0.5"]`). Plan: if closed + resolved and prices
-are a valid split summing to 1, pay each share its outcome price. I could not
-confirm how often this appears or exactly how the API reports it; will verify
-against a known split market once I have API access.
+Unchanged from the first pass: read APIs are public; I could not read the
+polymarket.com Terms of Use text. The footer shows "Market data: Polymarket"
+as text only (approved). No logo or brand assets are used.
 
-## 7. Terms / displaying their data
+## 8. Vercel Hobby **[docs]**
 
-- Read APIs are public and unauthenticated. **[docs-snippet]**
-- I could **not** retrieve the text of polymarket.com/tos (blocked here and
-  search only returned the header). So I can't tell you what it says about
-  redistributing data. Public availability is not the same as a license.
-- Trading on Polymarket is geoblocked for the US and other regions; the docs
-  frame geoblocking around **placing orders**, and say "data and information
-  is viewable globally" (3rd-party summary of their ToS). Birdly never places
-  real orders. **[docs-snippet]** + **[3rd-party]**
-- Our risk profile is low: private group of ~10, no money, no ads, no resale,
-  no Polymarket branding. But **you should read polymarket.com/tos yourself**
-  (search the page for "data", "scrap", "automated", "intellectual property").
-- Trademark: not using their name/logo is the safe call. A plain text
-  "Market data: Polymarket" credit is normally fine as nominative use and is
-  arguably the more honest thing to do; your call (see plan questions).
+Cron at most once per day (fires sometime within the hour); functions up to
+300 s with Fluid compute. Not yet verified from a real deploy.
 
-## 8. Vercel free (Hobby) plan
+Geoblocking check: open `/api/health/polymarket` on a deploy. It probes Gamma
+and CLOB from the server and reports `dataEndpointsOk` plus the Vercel region.
+It also calls Polymarket's own trading-geoblock endpoint, which is
+informational only (Birdly never places real orders).
 
-**[docs-snippet]** from vercel.com/docs (could not load pages directly):
-- **Cron jobs: once per day max on Hobby**, and it fires at some point
-  **within** the scheduled hour, not on the minute. Number of crons: the
-  limits table says 2 for Hobby; another Vercel-derived page says 100 per
-  project on all plans as of early 2026. Either way we need only 1.
-- **Function duration (Fluid compute, default on): 300s default and max on
-  Hobby.** Plenty for a resolution sweep of a few dozen markets.
-- Timeout returns 504 `FUNCTION_INVOCATION_TIMEOUT`.
+## 9. Supabase free plan **[unverified, third party]**
 
-Consequence: the daily cron is just a safety net. Lazy resolution on page
-load (which you already planned) is what actually makes payouts feel prompt.
-Live chart updates come from the browser polling our cached API routes, not
-from cron.
+500 MB DB; projects pause after 7 days without DB requests (the daily cron
+will prevent this); reported 2026 change requiring explicit Postgres GRANTs
+for PostgREST, which our migrations will include regardless.
 
-## 9. Supabase free plan (relevant gotchas)
+## 10. Domains Birdly needs
 
-**[3rd-party]**, verify on supabase.com/pricing:
-- 500 MB database, 2 active free projects, 50k MAU. Fine for us.
-- **Free projects pause after 7 days with no database requests**, and must
-  be manually restored. The daily Vercel cron will touch the DB, which keeps
-  it awake for free.
-- Reported change: projects created after 2026-05-30 need **explicit
-  Postgres GRANTs** for PostgREST access (existing projects from
-  2026-10-30). Our migrations will include explicit GRANTs regardless.
+Server side (Vercel functions):
+- `gamma-api.polymarket.com`
+- `clob.polymarket.com`
+- `polymarket.com` (only the optional `/api/health/polymarket` geoblock probe)
+- Phase 2+: your Supabase project, `<project-ref>.supabase.co`
 
-## 10. Current package versions (npm, 2026-10-09)
+Browser side:
+- `polymarket-upload.s3.us-east-2.amazonaws.com` (event images, loaded as
+  plain `<img>` so we don't burn Vercel's free image-optimization quota)
 
-next 16.4.0, tailwindcss 4.3.3, @supabase/supabase-js 2.117.3,
-@supabase/ssr 0.12.7, lightweight-charts 5.2.1, vitest 5.0.3.
+Build/dev (this cloud sandbox, not the deployed app):
+- `registry.npmjs.org` (npm), `fonts.googleapis.com` + `fonts.gstatic.com`
+  (the Geist font is downloaded at build time by `next/font`), `github.com`
+  (git push), and for Phase 2 `<project-ref>.supabase.co` +
+  `api.supabase.com` if migrations are run from here.
 
 ## Sources
 
-- https://github.com/Polymarket/clob-client-v2 (src/endpoints.ts, src/types/clob.ts, src/client.ts)
-- https://github.com/Polymarket/py-clob-client (py_clob_client/endpoints.py, client.py)
-- https://github.com/Polymarket/ts-sdk and npm `@polymarket/bindings@0.12.0`, `@polymarket/client@0.12.0`
-- https://docs.polymarket.com/api-reference/rate-limits
-- https://docs.polymarket.com/api-reference/markets/get-prices-history
-- https://docs.polymarket.com/api-reference/market-data/get-market-price
-- https://docs.polymarket.com/concepts/resolution
-- https://docs.polymarket.com/api-reference/geoblock
-- https://docs.polymarket.com/v2-migration
-- https://polymarket.com/tos (not readable from this environment)
-- https://vercel.com/docs/limits , https://vercel.com/docs/functions/limitations ,
-  https://vercel.com/changelog/higher-defaults-and-limits-for-vercel-functions-running-fluid-compute
-- Supabase limits: third party summaries (jetadmin.io, makerkit.dev); verify at https://supabase.com/pricing
+- Live requests to gamma-api.polymarket.com and clob.polymarket.com, 2026-10-09
+- https://github.com/Polymarket/clob-client-v2 , https://github.com/Polymarket/py-clob-client , npm `@polymarket/bindings@0.12.0`, `@polymarket/client@0.12.0`
+- https://docs.polymarket.com/api-reference/rate-limits , /concepts/resolution , /api-reference/geoblock , /v2-migration
+- https://vercel.com/docs/limits , https://vercel.com/docs/functions/limitations

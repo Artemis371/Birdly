@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+/* Color values come from src/config/site.ts (injected in layout.tsx).
+   These fallbacks only matter if that injection is missing. */
+:root {
+  --accent: #22c3e6;
+  --accent-strong: #0ea5c9;
+  --yes: #3fcf6e;
+  --no: #f0505a;
+  --bg: #0b0e13;
+  --surface: #131821;
+  --surface-2: #1a212d;
+  --border: #252e3c;
+  --text: #e8ecf2;
+  --muted: #8a96a8;
+  --warn: #f5b942;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-yes: var(--yes);
+  --color-no: var(--no);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-warn: var(--warn);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
