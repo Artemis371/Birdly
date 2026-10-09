@@ -24,19 +24,24 @@ function Signed({ v, pct }: { v: number; pct?: number | null }) {
   );
 }
 
-export default async function PortfolioPage() {
+export default async function PortfolioPage(props: PageProps<"/portfolio">) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/portfolio");
   // Lazy resolution: pay out any of this user's markets that have resolved,
   // so payouts show up even if the daily cron hasn't run yet.
   const resolution = await resolveForUser(user.id);
+  // The top bar's cash was read before the payout. Reload once so every part
+  // of the page (including the top bar) shows the new balance.
+  if (resolution?.paid.length) redirect(`/portfolio?paid=${resolution.paid.length}`);
+  const sp = await props.searchParams;
+  const paidCount = typeof sp.paid === "string" && /^\d{1,3}$/.test(sp.paid) ? Number(sp.paid) : 0;
   const p = await loadPortfolio(user.id);
 
   return (
     <div className="space-y-4">
-      {resolution?.paid.length ? (
+      {paidCount ? (
         <div role="status" className="rounded-xl border border-yes/40 bg-yes/10 px-4 py-3 text-sm text-yes">
-          {resolution.paid.length === 1 ? "A market you held just resolved" : `${resolution.paid.length} markets you held just resolved`} and paid out. See Trade history below.
+          {paidCount === 1 ? "A market you held just resolved" : `${paidCount} markets you held just resolved`} and paid out. See Trade history below.
         </div>
       ) : null}
 
@@ -80,20 +85,27 @@ export default async function PortfolioPage() {
           <ul className="space-y-2">
             {p.positions.map((pos) => (
               <li key={pos.tokenId} className="rounded-2xl border border-line bg-surface p-4">
-                <Link href={`/event/${pos.eventSlug}?c=${pos.conditionId}&side=${pos.outcomeIndex === 1 ? "no" : "yes"}`} className="flex items-start gap-3">
+                <Link
+                  href={pos.isCustom ? `/leahys/${pos.eventSlug}` : `/event/${pos.eventSlug}?c=${pos.conditionId}&side=${pos.outcomeIndex === 1 ? "no" : "yes"}`}
+                  className="flex items-start gap-3"
+                >
                   <EventThumb src={pos.image} alt="" size={36} />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{pos.label}</div>
                     <div className="truncate text-xs text-muted">{pos.eventTitle}</div>
                   </div>
-                  <span className={`shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold ${pos.outcomeIndex === 0 ? "bg-yes/15 text-yes" : "bg-no/15 text-no"}`}>
+                  <span
+                    className={`max-w-[40%] shrink-0 truncate rounded-md px-2 py-0.5 text-xs font-semibold ${
+                      pos.isCustom ? "bg-accent/15 text-accent" : pos.outcomeIndex === 0 ? "bg-yes/15 text-yes" : "bg-no/15 text-no"
+                    }`}
+                  >
                     {pos.outcomeName}
                   </span>
                 </Link>
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
                   <Stat k="Shares" v={shares(pos.shares)} />
                   <Stat k="Avg cost" v={cents(pos.avgCost)} />
-                  <Stat k="Bid now" v={pos.bid === null ? "no bid" : cents(pos.bid)} />
+                  <Stat k={pos.isCustom ? "Price now" : "Bid now"} v={pos.bid === null ? "no bid" : cents(pos.bid)} />
                   <div>
                     <div className="text-xs text-muted">Value · P&amp;L</div>
                     <div className="tabular">
@@ -122,7 +134,7 @@ export default async function PortfolioPage() {
                 >
                   {t.kind === "payout" ? (t.price >= 1 ? "won" : t.price > 0 ? "split" : "lost") : t.kind}
                 </span>
-                <Link href={`/event/${t.eventSlug}`} className="min-w-0 flex-1">
+                <Link href={t.isCustom ? `/leahys/${t.eventSlug}` : `/event/${t.eventSlug}`} className="min-w-0 flex-1">
                   <div className="truncate">
                     {t.outcomeName} · {t.label}
                   </div>

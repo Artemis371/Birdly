@@ -1,5 +1,5 @@
 import "server-only";
-import { getBooks } from "@/lib/polymarket/api";
+import { markPrices } from "@/lib/valuation";
 import { adminClient } from "@/lib/supabase/admin";
 import { currentSeasonId } from "@/lib/trading/deps";
 
@@ -15,9 +15,9 @@ export async function snapshotAll(): Promise<{ recorded: number; skipped: string
   const tokens = [...new Set((positions ?? []).map((p) => p.token_id as string))];
   let bids: Record<string, number | null> = {};
   if (tokens.length) {
-    const books = await getBooks(tokens);
-    if (books.stale) return { recorded: 0, skipped: "prices stale" };
-    bids = Object.fromEntries(Object.entries(books.data).map(([t, b]) => [t, b.bestBid]));
+    const m = await markPrices(tokens);
+    if (m.stale) return { recorded: 0, skipped: "prices stale" };
+    bids = m.prices;
   }
   const value = new Map<string, number>();
   for (const p of positions ?? []) {

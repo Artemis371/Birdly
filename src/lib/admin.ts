@@ -72,6 +72,7 @@ export async function listWaitingMarkets(): Promise<WaitingMarket[]> {
   const { data: markets } = await db
     .from("markets")
     .select("condition_id, label, event_title, event_slug, end_date, polymarket_closed, last_checked_at, resolution_note")
+    .eq("source", "polymarket")
     .is("resolved_at", null)
     .in("condition_id", [...byMarket.keys()].slice(0, 500));
   const now = Date.now();
@@ -90,4 +91,22 @@ export async function listWaitingMarkets(): Promise<WaitingMarket[]> {
       shares: byMarket.get(m.condition_id)?.shares ?? 0,
     }))
     .sort((a, b) => Number(b.closed) - Number(a.closed) || (a.endDate ?? "").localeCompare(b.endDate ?? ""));
+}
+
+// Custom markets past their end date that still need the admin's decision.
+export async function listEndedCustom(): Promise<{ id: string; title: string; endAt: string; notifySentAt: string | null; holders: number }[]> {
+  const db = adminClient();
+  const { data } = await db
+    .from("custom_markets")
+    .select("id, title, end_at, notify_sent_at")
+    .eq("status", "open")
+    .lte("end_at", new Date().toISOString())
+    .order("end_at");
+  const ids = (data ?? []).map((m) => `custom:${m.id}`);
+  const holders = new Map<string, Set<string>>();
+  if (ids.length) {
+    const { data: pos } = await db.from("positions").select("condition_id, user_id").in("condition_id", ids).gt("shares", 0);
+    for (const p of pos ?? []) holders.set(p.condition_id, (holders.get(p.condition_id) ?? new Set()).add(p.user_id));
+  }
+  return (data ?? []).map((m) => ({ id: m.id, title: m.title, endAt: m.end_at, notifySentAt: m.notify_sent_at, holders: holders.get(`custom:${m.id}`)?.size ?? 0 }));
 }

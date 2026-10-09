@@ -65,3 +65,6 @@ export const categories = [
   { label: "Culture", slug: "pop-culture" },
   { label: "World", slug: "world" },
 ] as const;
+
+// Our own private markets tab (members only). Shown second in the category row.
+export const customTab = { label: "Leahys", slug: "leahys" } as const;

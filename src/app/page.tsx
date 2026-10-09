@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { ErrorPanel, StaleBanner } from "@/components/StaleBanner";
 import { EventCard, cardTokenIds } from "@/components/markets/EventCard";
-import { categories } from "@/config/site";
+import { CustomMarketCard } from "@/components/custom/CustomMarketCard";
+import { categories, customTab } from "@/config/site";
+import { getCurrentUser } from "@/lib/auth/session";
+import { listPublishedCustom } from "@/lib/custom/markets";
+import type { CustomMarket } from "@/lib/custom/types";
 import { SORTS, type SortKey, getBooks, listEvents, searchEvents, type EventPage } from "@/lib/polymarket/api";
 import type { Fetched, OrderBook } from "@/lib/polymarket/types";
 
@@ -19,9 +23,43 @@ export default async function Home(props: PageProps<"/">) {
   const sort: SortKey = SORTS.some((s) => s.key === sortParam) ? sortParam : "trending";
   const cursor = first(sp.cursor) || undefined;
 
+  // The custom-markets tab only exists for signed-in members.
+  let user = null;
+  try {
+    user = await getCurrentUser();
+  } catch {}
+  const showCustom = !q && !!user && tag === customTab.slug;
+  const chips = user ? [categories[0], { label: customTab.label, slug: customTab.slug }, ...categories.slice(1)] : [...categories];
+
+  if (showCustom) {
+    let custom: CustomMarket[] | null = null;
+    try {
+      custom = await listPublishedCustom();
+    } catch {
+      custom = null;
+    }
+    return (
+      <div>
+        <Chips chips={chips} active={tag} />
+        <p className="mb-4 text-sm text-muted">Our own private markets. Only members can see these.</p>
+        {!custom ? (
+          <ErrorPanel title="Couldn't load these right now">Try again in a minute.</ErrorPanel>
+        ) : custom.length === 0 ? (
+          <ErrorPanel title="No markets here yet">{user?.isAdmin ? "Create or publish one from the Admin page." : "Check back soon."}</ErrorPanel>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {custom.map((m) => (
+              <CustomMarketCard key={m.id} m={m} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   let page: Fetched<EventPage> | null = null;
   try {
-    page = q ? await searchEvents(q) : await listEvents({ sort, tag, cursor });
+    page = q ? await searchEvents(q) : await listEvents({ sort, tag: tag === customTab.slug ? undefined : tag, cursor });
   } catch {
     page = null;
   }
@@ -61,22 +99,7 @@ export default async function Home(props: PageProps<"/">) {
 
       {!q ? (
         <>
-          <div className="no-scrollbar -mx-4 mb-2 flex gap-1.5 overflow-x-auto px-4">
-            {categories.map((c) => {
-              const active = (c.slug || "") === tag;
-              return (
-                <Link
-                  key={c.label}
-                  href={href({ tag: c.slug || undefined, cursor: undefined })}
-                  className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium ${
-                    active ? "bg-accent text-bg" : "bg-surface text-muted hover:text-text"
-                  }`}
-                >
-                  {c.label}
-                </Link>
-              );
-            })}
-          </div>
+          <Chips chips={chips} active={tag} href={(slug) => href({ tag: slug || undefined, cursor: undefined })} />
           <div className="mb-4 flex gap-4 border-b border-line text-sm">
             {SORTS.map((s) => (
               <Link
@@ -125,6 +148,24 @@ export default async function Home(props: PageProps<"/">) {
           ) : null}
         </>
       )}
+    </div>
+  );
+}
+
+function Chips({ chips, active, href }: { chips: { label: string; slug: string }[]; active: string; href?: (slug: string) => string }) {
+  return (
+    <div className="no-scrollbar -mx-4 mb-2 flex gap-1.5 overflow-x-auto px-4 pb-2">
+      {chips.map((c) => (
+        <Link
+          key={c.label}
+          href={href ? href(c.slug) : c.slug ? `/?tag=${c.slug}` : "/"}
+          className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-medium ${
+            (c.slug || "") === active ? "bg-accent text-bg" : "bg-surface text-muted hover:text-text"
+          }`}
+        >
+          {c.label}
+        </Link>
+      ))}
     </div>
   );
 }

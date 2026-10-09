@@ -11,10 +11,19 @@ const EMPTY: PricePoint[] = [];
 
 type Result = { key: string; ok: boolean; points: PricePoint[]; stale: boolean };
 
-export function PriceChart({ tokenId, label, liveProb }: { tokenId: string; label: string; liveProb?: number | null }) {
+type ChartProps = {
+  tokenId: string;
+  label: string;
+  liveProb?: number | null;
+  // Where to load history from; defaults to the public Polymarket history route.
+  historyBase?: string;
+};
+
+export function PriceChart({ tokenId, label, liveProb, historyBase }: ChartProps) {
+  const base = historyBase ?? `/api/history?token=${tokenId}`;
   const [range, setRange] = useState<ChartRange>("1D");
   const [result, setResult] = useState<Result | null>(null);
-  const key = `${tokenId}|${range}`;
+  const key = `${base}|${range}`;
   const current = result?.key === key ? result : null;
   const points = current?.points ?? EMPTY;
   const status: "loading" | "ok" | "error" = !current ? "loading" : current.ok ? "ok" : "error";
@@ -79,10 +88,10 @@ export function PriceChart({ tokenId, label, liveProb }: { tokenId: string; labe
   useEffect(() => {
     let cancelled = false;
     fitted.current = false;
-    const k = `${tokenId}|${range}`;
+    const k = `${base}|${range}`;
     async function load() {
       try {
-        const res = await fetch(`/api/history?token=${tokenId}&range=${range}`);
+        const res = await fetch(`${base}&range=${range}`);
         if (!res.ok) throw new Error(String(res.status));
         const body = (await res.json()) as { points: PricePoint[]; stale: boolean };
         if (!cancelled) setResult({ key: k, ok: true, points: body.points, stale: body.stale });
@@ -100,7 +109,7 @@ export function PriceChart({ tokenId, label, liveProb }: { tokenId: string; labe
       cancelled = true;
       clearInterval(id);
     };
-  }, [tokenId, range]);
+  }, [base, range]);
 
   // Push data into the chart.
   useEffect(() => {

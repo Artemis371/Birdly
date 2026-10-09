@@ -32,7 +32,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-4">{children}</main>
         <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+          <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 pb-24 pt-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between md:pb-6">
             <span>
               {site.name} · Paper money only. Nothing here is real money or financial advice.
             </span>

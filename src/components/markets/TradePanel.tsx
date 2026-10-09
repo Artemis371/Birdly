@@ -10,16 +10,16 @@ import type { Market } from "@/lib/polymarket/types";
 import type { Quote, QuoteError } from "@/lib/trading/quote";
 import type { Viewer } from "./EventView";
 
-const QUOTE_ERRORS: Record<QuoteError, string> = {
+export const QUOTE_ERRORS: Record<QuoteError, string> = {
   no_quote: "No one is offering a price on this side right now, so it can't be traded.",
   price_out_of_range: "This outcome is priced at the extreme (basically decided), so trading is blocked.",
   amount_too_small: "Amount too small to fill.",
   nothing_to_sell: "Enter how many shares to sell.",
 };
 
-type OkQuote = Extract<Quote, { ok: true }>;
-type Signed = { quote: OkQuote; token: string; expiresAt: number; outcomeName: string; label: string };
-type Confirming = { signed: Signed; notice?: string };
+export type OkQuote = Extract<Quote, { ok: true }>;
+export type Signed = { quote: OkQuote; token: string; expiresAt: number; outcomeName: string; label: string };
+export type Confirming = { signed: Signed; notice?: string };
 
 type Props = {
   slug: string;
@@ -255,10 +255,11 @@ export function TradePanel({ slug, market, live, outcomeIndex, onOutcome, blocke
   );
 }
 
-function QuoteRows({ q, mode }: { q: OkQuote; mode: "buy" | "sell" }) {
+export function QuoteRows({ q, mode, lmsr }: { q: OkQuote; mode: "buy" | "sell"; lmsr?: boolean }) {
   return (
     <>
       <Row k="Avg price" v={cents(q.avgPrice)} />
+      {lmsr ? <Row k="Price after" v={cents(q.worstPrice)} /> : null}
       <Row k="Shares" v={fmtShares(q.shares)} />
       <Row k={mode === "buy" ? "Cost" : "You receive"} v={usd(q.total)} />
       {mode === "buy" ? <Row k="Payout if it wins" v={usd(q.payoutIfWin)} strong /> : null}
@@ -273,7 +274,21 @@ function QuoteRows({ q, mode }: { q: OkQuote; mode: "buy" | "sell" }) {
   );
 }
 
-function ConfirmSheet({ c, mode, busy, onCancel, onConfirm }: { c: Confirming; mode: "buy" | "sell"; busy: boolean; onCancel: () => void; onConfirm: () => void }) {
+export function ConfirmSheet({
+  c,
+  mode,
+  busy,
+  onCancel,
+  onConfirm,
+  lmsr,
+}: {
+  c: Confirming;
+  mode: "buy" | "sell";
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  lmsr?: boolean;
+}) {
   const q = c.signed.quote;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Confirm trade">
@@ -284,10 +299,10 @@ function ConfirmSheet({ c, mode, busy, onCancel, onConfirm }: { c: Confirming; m
         <p className="mb-3 truncate text-sm text-muted">{c.signed.label}</p>
         {c.notice ? <p className="mb-3 rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">{c.notice}</p> : null}
         <div className="space-y-1.5 text-sm">
-          <QuoteRows q={q} mode={mode} />
+          <QuoteRows q={q} mode={mode} lmsr={lmsr} />
         </div>
         <p className="mt-3 text-xs text-muted">
-          Fresh price from the live order book. If it moves more than {Math.round(trading.quoteTolerance * 100)}¢ before you confirm, we&apos;ll show you the new one first.
+          {lmsr ? "Fresh price from the market maker." : "Fresh price from the live order book."} If it moves more than {Math.round(trading.quoteTolerance * 100)}¢ before you confirm, we&apos;ll show you the new one first.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button onClick={onCancel} disabled={busy} className="rounded-xl border border-line py-3 text-sm font-semibold text-muted">

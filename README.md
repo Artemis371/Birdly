@@ -12,8 +12,8 @@ Birdly never places real orders.
 |---|---|---|
 | 1 | Market browsing, market page, live prices, charts (no auth) | Done |
 | 2 | Auth (invite code), balances, buying/selling, portfolio, admin | Done |
-| 3 | Automatic resolution and payouts | **Ready to test** |
-| 4 | Leaderboard, activity feed, polish, deploy | Not started |
+| 3 | Automatic resolution and payouts | Done |
+| 4 | Leaderboard, activity feed, Leahys custom markets, polish | **Ready to test** |
 
 ## Change the brand in one place
 
@@ -142,6 +142,69 @@ plan allows one run per day and may start it anytime within that hour).
   `curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://YOUR-SITE/api/cron/daily`
 - Vercel -> project -> **Settings -> Cron Jobs** shows the job and lets you run it.
 
+## Setup (Phase 4: Leahys markets and reminder emails)
+
+### 1. Run migration 0003
+
+1. On GitHub, open `supabase/migrations/0003_custom_markets.sql` and click **Raw**.
+2. Supabase -> **SQL Editor** -> **New query** -> paste the whole file -> **Run**.
+3. Safe to run more than once. It also creates the four seeded **drafts**
+   (Hannah's job, Beahy's leg, Beahy and Harry McLary, Liam's garage floor).
+   Publish each from **Admin -> Leahys markets -> Publish**.
+
+### 2. Reminder emails (Resend)
+
+When a Leahys market passes its end date, trading closes and the daily cron
+emails you once, with a link straight to its resolve page.
+
+1. Sign up at https://resend.com **using the same email you'll put in
+   `ADMIN_NOTIFY_EMAIL`**. Without a verified domain, Resend's default sender
+   can only deliver to your own account email, which is all we need.
+2. Resend -> **API Keys** -> **Create API key** (sending access is enough).
+3. Add these in Vercel (Production):
+
+| Name | Value | Secret? |
+|---|---|---|
+| `RESEND_API_KEY` | The key from step 2 (`re_...`) | **Yes. Mark it Sensitive.** |
+| `ADMIN_NOTIFY_EMAIL` | The email to notify (your Resend account email) | No |
+| `EMAIL_FROM` | Optional. Leave unset unless you verify a domain in Resend. | No |
+
+Without these, everything still works: ended markets show up under
+**Admin -> Waiting to pay out** with a note that emails are off.
+
+## Leahys markets (custom markets)
+
+- Members-only: logged-out visitors don't see the tab, the cards, or the pages
+  (they get a plain 404). Drafts are visible to admins only. The tab name lives
+  in `src/config/site.ts` (`customTab`).
+- **Pricing: LMSR automated market maker.** Every outcome starts at equal odds
+  (50/50, or 11% each with 9 outcomes); buying an outcome raises its price and
+  lowers the others; prices always add up to 100%. Fills are instant, using
+  the same quote -> confirm -> execute flow and safety rules as Polymarket
+  trades (server-side pricing inside one locked database transaction, single-use
+  60-second quotes, no overspending, no overselling, $2,000 per-trade cap).
+- **Liquidity (default 1,000)** sets how much money it takes to move the odds.
+  For a yes/no market at 50%:
+
+  | Liquidity | 50% -> 60% | 50% -> 75% | 50% -> 90% | House's max subsidy (yes/no / 9 outcomes) |
+  |---|---|---|---|---|
+  | 500 | $112 | $347 | $805 | $347 / $1,099 |
+  | **1,000 (default)** | **$223** | **$693** | **$1,609** | **$693 / $2,197** |
+  | 2,500 | $558 | $1,733 | $4,024 | $1,733 / $5,493 |
+
+  1,000 fits 5 to 10 people with $10,000 each: a $100 bet nudges a 50/50 market
+  to about 55%, a confident $500 bet moves it to about 70%, and nobody can push
+  it to 99% without spending close to $4,000. Lower it for livelier prices,
+  raise it for steadier ones. With many outcomes each one starts cheaper, so
+  the same dollars move a single outcome more (a $100 bet takes one of 9
+  outcomes from 11% to about 20%).
+- **Charts** record a price point on every trade.
+- **Editing:** drafts (and published markets with no trades yet) are fully
+  editable. Once anyone has traded, only the description and end date can change.
+- **Resolving:** Admin -> Leahys markets -> **Resolve early** (any time after
+  publishing) or **Pick winner** (after the end date). Winning shares pay $1,
+  everything else $0, in one transaction that can't pay twice.
+
 ## Run it locally
 
 Requires Node 20.9+ (tested on Node 22).
@@ -209,7 +272,17 @@ npm run build
 - **Idempotent:** `resolve_market` locks the market row and refuses to pay a
   market twice, so the cron, a portfolio load and the admin button can all run
   at the same moment safely.
-- The cron also records a daily account-value snapshot for every member.
+- The cron also records a daily account-value snapshot for every member, and
+  emails the admin once per ended Leahys market.
+
+## Leaderboard and activity
+
+- **Leaderboard** ranks everyone by cash plus open positions at today's sell
+  price (real best bid for Polymarket, current price for Leahys markets), with
+  % return against the starting balance. Ties share a rank.
+- **Activity** shows the group's recent buys, sells and payouts. Both are
+  members-only. On phones, a bottom tab bar gets you to Markets, Leaders,
+  Activity and Portfolio.
 
 ## How it works (market data)
 
@@ -242,6 +315,9 @@ src/lib/trading/execute.ts    quote -> confirm -> execute rules (fresh price, to
 src/lib/auth/                 signup, session, validation, admin/rate-limit guards
 supabase/migrations/          SQL to paste into the Supabase SQL editor
 src/lib/resolution/           payout rule (decide.ts) + shared resolution step (run.ts)
+src/lib/lmsr/                 LMSR market maker math (mirrored in SQL)
+src/lib/custom/               Leahys markets: loading, trading, validation, reminder emails
+src/test/custom.db.test.ts    Leahys markets in PGlite: seeds, trades, editing locks, resolution, RLS
 src/app/api/cron/daily/       daily cron: resolution + snapshots (needs CRON_SECRET)
 src/test/db.test.ts           runs the real migrations in PGlite: atomic signup, trades, RLS
 src/test/resolution.db.test.ts  payouts, 50/50, double resolution, re-running 0002

@@ -18,6 +18,7 @@ async function loadCandidates(opts: { userId?: string; minRecheckMs?: number; li
   const { data: markets, error: mErr } = await db
     .from("markets")
     .select("condition_id, outcomes, last_checked_at")
+    .eq("source", "polymarket") // custom markets are resolved by the admin
     .is("resolved_at", null)
     .in("condition_id", ids.slice(0, 500));
   if (mErr) throw new Error(mErr.message);
