@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { AddOutcome } from "@/components/custom/AddOutcome";
 import { CustomMarketForm } from "@/components/custom/CustomMarketForm";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getCustomById } from "@/lib/custom/markets";
@@ -23,7 +24,8 @@ export default async function EditCustomPage(props: PageProps<"/admin/leahys/[id
       </Link>
       <h1 className="mb-1 text-2xl font-bold">Edit market</h1>
       <p className="mb-4 text-sm text-muted">{market.status === "draft" ? "Draft: not visible to members yet." : "Published."}</p>
-      <CustomMarketForm market={market} />
+      <CustomMarketForm key={market.outcomes.join("\n")} market={market} />
+      {market.status === "open" ? <AddOutcome market={market} /> : null}
     </div>
   );
 }

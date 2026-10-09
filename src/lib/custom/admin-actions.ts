@@ -12,6 +12,10 @@ const DB_ERRORS: Record<string, string> = {
   custom_markets_slug_key: "Another market already uses that URL name.",
   market_cancelled: "This market was cancelled, so it can't be resolved.",
   market_closed: "This market is closed (resolved or cancelled) and can't be changed.",
+  duplicate_outcome: "That outcome already exists.",
+  too_many_outcomes: "A market can have at most 12 outcomes.",
+  invalid_start_price: "Starting chance must be between 1% and 50%.",
+  invalid_outcome_name: "Give the new outcome a name (up to 60 characters).",
 };
 
 export function friendly(message: string): string {

@@ -161,7 +161,13 @@ re-run. It only changes the dates of markets that are still drafts; if you
 already published one, change its end date in the edit form (allowed even
 after trades).
 
-### 3. Reminder emails (Resend)
+### 3. Run migration 0005
+
+Lets the admin add an outcome to a live market. Copy
+`supabase/migrations/0005_add_outcome.sql` from the **Raw** view on GitHub,
+paste into the SQL Editor, **Run**. Safe to re-run.
+
+### 4. Reminder emails (Resend)
 
 When a Leahys market passes its end date, trading closes and the daily cron
 emails you once, with a link straight to its resolve page.
@@ -214,6 +220,11 @@ Without these, everything still works: ended markets show up under
   after publishing, so "when will X happen" markets can resolve early) or
   **Pick winner / cancel** (after the end date). Winning shares pay $1,
   everything else $0, in one transaction that can't pay twice.
+- **Adding an outcome later:** Admin -> Leahys markets -> **Edit** -> **Add an
+  outcome** (needs migration `0005`). Works after trading has started: the new
+  option starts at the chance you pick (1% to 50%), every existing option keeps
+  its relative odds and is scaled down to make room, and nobody's shares or
+  cash change. You can update the rules in the same step. Logged in admin actions.
 - **Cancelling:** on the same page, **Cancel market and refund** shows exactly
   who gets what, then asks you to confirm. Each person gets back
   `total paid in buys - total received from sells` for that market, floored

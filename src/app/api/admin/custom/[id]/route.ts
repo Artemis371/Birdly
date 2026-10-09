@@ -5,7 +5,7 @@ import { friendly, saveCustomMarket } from "@/lib/custom/admin-actions";
 import { getCustomById } from "@/lib/custom/markets";
 import { adminClient } from "@/lib/supabase/admin";
 
-// actions: save | publish | delete | resolve | cancel
+// actions: save | publish | delete | resolve | cancel | add_outcome
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/custom/[id]">) {
   const admin = await requireAdmin();
   if (admin instanceof Response) return admin;
@@ -35,6 +35,16 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/custo
     const { data, error } = await db.rpc("resolve_custom_market", { p_admin_id: admin.id, p_id: id, p_winner: winner });
     if (error) return json({ error: friendly(error.message) }, { status: 400 });
     return json({ ok: true, alreadyResolved: !!data.already_resolved, paidPositions: Number(data.paid_positions), totalPaid: Number(data.total_paid) });
+  }
+  if (body.action === "add_outcome") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const start = Number(body.startPrice);
+    if (!name || name.length > 60) return json({ error: "Give the new outcome a name (up to 60 characters)." }, { status: 400 });
+    if (!(start >= 0.01 && start <= 0.5)) return json({ error: "Starting chance must be between 1% and 50%." }, { status: 400 });
+    const rules = typeof body.rules === "string" && body.rules.trim() && body.rules.trim() !== m.rules ? body.rules.trim().slice(0, 4000) : null;
+    const { data, error } = await db.rpc("admin_add_custom_outcome", { p_admin_id: admin.id, p_id: id, p_name: name, p_start_price: start, p_rules: rules });
+    if (error) return json({ error: friendly(error.message) }, { status: 400 });
+    return json({ ok: true, outcomes: data.outcomes, prices: data.prices });
   }
   if (body.action === "cancel") {
     // Refunds everyone what they paid in, net of sales. Idempotent in SQL.
