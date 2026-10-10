@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { redirect } from "next/navigation";
 import { ValueChart } from "@/components/ValueChart";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { Flash } from "@/components/Flash";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { refresh } from "@/config/site";
 import { EventThumb } from "@/components/markets/EventThumb";
 import { getCurrentUser } from "@/lib/auth/session";
 import { cents, shares, usd } from "@/lib/format";
@@ -40,6 +43,7 @@ export default async function PortfolioPage(props: PageProps<"/portfolio">) {
 
   return (
     <div className="space-y-4">
+      <AutoRefresh ms={refresh.accountMs} />
       {paidCount ? (
         <div role="status" className="rounded-xl border border-yes/40 bg-yes/10 px-4 py-3 text-sm text-yes">
           {paidCount === 1 ? "A market you held just resolved" : `${paidCount} markets you held just resolved`} and paid out. See Trade history below.
@@ -62,18 +66,24 @@ export default async function PortfolioPage(props: PageProps<"/portfolio">) {
             Account settings
           </Link>
         </div>
-        <div className="tabular text-3xl font-bold">{usd(p.total)}</div>
+        <div className="tabular text-3xl font-bold">
+          <Flash value={p.total}>{usd(p.total)}</Flash>
+        </div>
         <div className="text-sm">
           <Signed v={p.pnl} pct={p.pnlPct} /> <span className="text-muted">all time</span>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
           <div className="rounded-xl bg-surface-2 p-3">
             <div className="text-xs text-muted">Cash</div>
-            <div className="tabular font-semibold">{usd(p.cash)}</div>
+            <div className="tabular font-semibold">
+              <Flash value={p.cash}>{usd(p.cash)}</Flash>
+            </div>
           </div>
           <div className="rounded-xl bg-surface-2 p-3">
             <div className="text-xs text-muted">Positions (at best bid)</div>
-            <div className="tabular font-semibold">{usd(p.positionsValue)}</div>
+            <div className="tabular font-semibold">
+              <Flash value={p.positionsValue}>{usd(p.positionsValue)}</Flash>
+            </div>
           </div>
         </div>
         <div className="mt-4">
@@ -114,7 +124,7 @@ export default async function PortfolioPage(props: PageProps<"/portfolio">) {
                 <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
                   <Stat k="Shares" v={shares(pos.shares)} />
                   <Stat k="Avg cost" v={cents(pos.avgCost)} />
-                  <Stat k={pos.isCustom ? "Price now" : "Bid now"} v={pos.bid === null ? "no bid" : cents(pos.bid)} />
+                  <Stat k={pos.isCustom ? "Price now" : "Bid now"} v={<Flash value={pos.bid}>{pos.bid === null ? "no bid" : cents(pos.bid)}</Flash>} />
                   <div>
                     <div className="text-xs text-muted">Value · P&amp;L</div>
                     <div className="tabular">
@@ -166,7 +176,7 @@ export default async function PortfolioPage(props: PageProps<"/portfolio">) {
   );
 }
 
-function Stat({ k, v }: { k: string; v: string }) {
+function Stat({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div>
       <div className="text-xs text-muted">{k}</div>

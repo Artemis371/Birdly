@@ -1,8 +1,9 @@
-import Link from "next/link";
+import Link from "@/components/Link";
+import { AutoRefresh } from "@/components/AutoRefresh";
 import { ErrorPanel, StaleBanner } from "@/components/StaleBanner";
 import { EventCard, cardTokenIds } from "@/components/markets/EventCard";
 import { CustomMarketCard } from "@/components/custom/CustomMarketCard";
-import { categories, customTab } from "@/config/site";
+import { categories, customTab, refresh } from "@/config/site";
 import { getCurrentUser } from "@/lib/auth/session";
 import { countCustomDrafts, listPublishedCustom } from "@/lib/custom/markets";
 import type { CustomMarket } from "@/lib/custom/types";
@@ -41,6 +42,7 @@ export default async function Home(props: PageProps<"/">) {
     }
     return (
       <div>
+        <AutoRefresh ms={refresh.gridMs} />
         <Chips chips={chips} active={tag} />
         <p className="mb-4 text-sm text-muted">Our own private markets. Only members can see these.</p>
         {user.isAdmin ? (
@@ -96,6 +98,7 @@ export default async function Home(props: PageProps<"/">) {
 
   return (
     <div>
+      <AutoRefresh ms={refresh.gridMs} />
       <form action="/" className="mb-3">
         <label htmlFor="q" className="sr-only">
           Search markets

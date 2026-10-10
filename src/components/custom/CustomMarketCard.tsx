@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { BirdMark } from "@/components/brand/Logo";
 import type { CustomMarket } from "@/lib/custom/types";
 import { compactUsd, pct, timeLeft } from "@/lib/format";

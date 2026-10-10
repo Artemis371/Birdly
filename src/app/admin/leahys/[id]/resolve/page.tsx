@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { ResolveCustom } from "@/components/custom/ResolveCustom";
 import { getCurrentUser } from "@/lib/auth/session";

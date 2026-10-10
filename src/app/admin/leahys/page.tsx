@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { AdminCustomList } from "@/components/custom/AdminCustomList";
 import { customTab } from "@/config/site";

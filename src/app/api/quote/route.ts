@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { cacheTtl } from "@/config/site";
 import { TOKEN_RE, json } from "@/lib/api-response";
 import { getBooks } from "@/lib/polymarket/api";
 import { quoteBuy, quoteSell } from "@/lib/trading/quote";
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
     const book = books.data[token];
     if (!book) return json({ quote: { ok: false, reason: "no_quote" }, stale: books.stale });
     const quote = side === "buy" ? quoteBuy(book, amount) : quoteSell(book, amount);
-    return json({ quote, stale: books.stale, fetchedAt: books.fetchedAt }, { sMaxAge: 3 });
+    return json({ quote, stale: books.stale, fetchedAt: books.fetchedAt }, { sMaxAge: cacheTtl.cdnQuote });
   } catch {
     return json({ error: "upstream_unavailable" }, { status: 503 });
   }

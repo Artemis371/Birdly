@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Nav } from "@/components/Nav";
+import { PausedIndicator } from "@/components/PausedIndicator";
 import { RecoveryLinkHandler } from "@/components/RecoveryLinkHandler";
 import { site } from "@/config/site";
 import "./globals.css";
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col">
         <RecoveryLinkHandler />
+        <PausedIndicator />
         <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur">
           <Nav />
         </header>

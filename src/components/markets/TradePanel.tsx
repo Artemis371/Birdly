@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { trading } from "@/config/site";
+import { Flash } from "@/components/Flash";
+import { refresh, trading } from "@/config/site";
+import { fetchJson, usePolling } from "@/lib/client/usePolling";
 import { cents, shares as fmtShares, usd } from "@/lib/format";
 import type { LiveMarket } from "@/lib/polymarket/display";
 import type { Market } from "@/lib/polymarket/types";
@@ -67,6 +69,19 @@ export function TradePanel({ slug, market, live, outcomeIndex, onOutcome, blocke
       clearTimeout(t);
     };
   }, [reqKey, token, mode, value]);
+
+  // Keep the preview current while an amount is entered (same cadence as the
+  // live prices). A failed refresh keeps the last preview and backs off.
+  // Execution never uses this: it re-prices from a fresh book on the server.
+  usePolling(
+    async (signal) => {
+      const key = reqKey;
+      const body = await fetchJson<{ quote: Quote }>(`/api/quote?token=${token}&side=${mode}&amount=${value}`, signal);
+      setPreview((prev) => (prev?.key === key ? { key, quote: body.quote } : prev));
+    },
+    refresh.livePricesMs,
+    { enabled: reqKey !== null && !confirming },
+  );
 
   // Logged-out "Log in to trade" returns to this exact market and side.
   const loginHref = `/login?next=${encodeURIComponent(`${pathname}?m=${market.id}${outcomeIndex === 1 ? "&side=no" : ""}`)}`;
@@ -161,7 +176,7 @@ export function TradePanel({ slug, market, live, outcomeIndex, onOutcome, blocke
                 selected ? (tone === "yes" ? "bg-yes text-bg" : "bg-no text-bg") : tone === "yes" ? "bg-yes/15 text-yes" : "bg-no/15 text-no"
               }`}
             >
-              {o.name} {cents(price ?? null)}
+              {o.name} <Flash value={price}>{cents(price ?? null)}</Flash>
             </button>
           );
         })}

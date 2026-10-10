@@ -3,6 +3,7 @@
 import { AreaSeries, ColorType, CrosshairMode, LineStyle, createChart, type IChartApi, type ISeriesApi, type UTCTimestamp } from "lightweight-charts";
 import { useEffect, useRef, useState } from "react";
 import { refresh, site } from "@/config/site";
+import { fetchJson, usePolling } from "@/lib/client/usePolling";
 import { pct } from "@/lib/format";
 import type { ChartRange, PricePoint } from "@/lib/polymarket/types";
 
@@ -84,7 +85,7 @@ export function PriceChart({ tokenId, label, liveProb, historyBase }: ChartProps
     };
   }, []);
 
-  // Load + poll history for the selected token and range.
+  // Load history for the selected token and range; usePolling below keeps it fresh.
   useEffect(() => {
     let cancelled = false;
     fitted.current = false;
@@ -102,14 +103,22 @@ export function PriceChart({ tokenId, label, liveProb, historyBase }: ChartProps
       }
     }
     load();
-    const id = setInterval(() => {
-      if (document.visibilityState === "visible") load();
-    }, refresh.chartMs);
     return () => {
       cancelled = true;
-      clearInterval(id);
     };
   }, [base, range]);
+
+  // Refresh every refresh.chartMs while the person is here; back off on errors.
+  usePolling(async (signal) => {
+    const k = `${base}|${range}`;
+    try {
+      const body = await fetchJson<{ points: PricePoint[]; stale: boolean }>(`${base}&range=${range}`, signal);
+      setResult((prev) => (prev && prev.key !== k ? prev : { key: k, ok: true, points: body.points, stale: body.stale }));
+    } catch (err) {
+      setResult((prev) => (prev?.key === k && prev.points.length ? { ...prev, stale: true } : prev));
+      throw err;
+    }
+  }, refresh.chartMs);
 
   // Push data into the chart.
   useEffect(() => {

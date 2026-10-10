@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { cacheTtl } from "@/config/site";
 import { customTokenPrices } from "@/lib/custom/markets";
 import { isCustomToken } from "@/lib/custom/types";
 import { fetchBooks } from "@/lib/polymarket/api";
@@ -24,7 +25,7 @@ import { adminClient } from "@/lib/supabase/admin";
 // stale. On a fresh server instance with no last known bid, the price of the
 // most recent Birdly trade in that token is used instead (also stale).
 
-export const MARK_TTL_MS = 30_000;
+export const MARK_TTL_MS = cacheTtl.accountPrices * 1000;
 
 export type Marks = {
   prices: Record<string, number | null>;

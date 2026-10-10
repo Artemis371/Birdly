@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { redirect } from "next/navigation";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { refresh } from "@/config/site";
 import { getCurrentUser } from "@/lib/auth/session";
 import { ACTIVITY_PAGE, loadActivity, type ActivityItem } from "@/lib/activity";
 import { cents, nowMs, shares, usd } from "@/lib/format";
@@ -60,6 +62,7 @@ export default async function ActivityPage(props: PageProps<"/activity">) {
 
   return (
     <div className="mx-auto max-w-2xl">
+      <AutoRefresh ms={refresh.activityMs} />
       <h1 className="mb-4 text-2xl font-bold">Activity</h1>
       {items.length === 0 ? (
         <p className="rounded-2xl border border-line bg-surface p-6 text-center text-sm text-muted">No trades yet. Somebody has to go first.</p>

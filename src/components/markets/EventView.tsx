@@ -1,8 +1,10 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Flash } from "@/components/Flash";
 import { refresh } from "@/config/site";
+import { fetchJson, usePolling } from "@/lib/client/usePolling";
 import { cents, compactUsd, pct } from "@/lib/format";
 import { marketBlockReason, orderMarkets, type LiveMarket, type LiveResponse } from "@/lib/polymarket/display";
 import type { PolyEvent } from "@/lib/polymarket/types";
@@ -36,28 +38,24 @@ export function EventView({ ev, initialLive, initialMarketId, initialSide, viewe
   const router = useRouter();
   const pathname = usePathname();
 
-  useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      if (document.visibilityState !== "visible") return;
-      try {
-        const res = await fetch(`/api/event/${ev.slug}/live`);
-        if (!res.ok) throw new Error(String(res.status));
-        const body = (await res.json()) as LiveResponse;
-        if (!cancelled) {
-          setLive(body);
-          setLiveError(false);
-        }
-      } catch {
-        if (!cancelled) setLiveError(true);
-      }
+  // Live prices every refresh.livePricesMs while the person is here. The
+  // server route is CDN-cached for a couple of seconds, so everyone watching
+  // this market shares one upstream request. One failed poll alone doesn't
+  // flip the page to "stale"; two in a row (with backoff in between) does.
+  const failures = useRef(0);
+  usePolling(async (signal) => {
+    try {
+      const body = await fetchJson<LiveResponse>(`/api/event/${ev.slug}/live`, signal);
+      failures.current = 0;
+      setLive(body);
+      setLiveError(false);
+    } catch (err) {
+      if (signal.aborted) throw err;
+      failures.current++;
+      if (failures.current >= 2) setLiveError(true);
+      throw err;
     }
-    const id = setInterval(poll, refresh.livePricesMs);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [ev.slug]);
+  }, refresh.livePricesMs);
 
   const liveById = useMemo(() => new Map((live?.markets ?? []).map((m) => [m.id, m])), [live]);
   const selected = markets.find((m) => m.id === selectedId) ?? markets[0];
@@ -148,15 +146,17 @@ function OutcomeRow({ m, live, active, onSelect }: { m: PolyEvent["markets"][num
         <div className="truncate text-sm font-medium">{m.label}</div>
         <div className="text-xs text-muted">{compactUsd(m.volume)} vol</div>
       </button>
-      <span className="tabular w-12 text-right text-lg font-bold">{pct(prob)}</span>
+      <Flash value={pct(prob)} className="tabular w-12 text-right text-lg font-bold">
+        {pct(prob)}
+      </Flash>
       <div className="flex shrink-0 gap-1.5">
         <button onClick={() => onSelect(m.id, 0)} className="rounded-lg bg-yes/15 px-2.5 py-2 text-xs font-semibold text-yes hover:bg-yes/25 sm:px-3">
           <span className="hidden sm:inline">{m.outcomes[0].name} </span>
-          {cents(live?.yes.ask ?? null)}
+          <Flash value={live?.yes.ask}>{cents(live?.yes.ask ?? null)}</Flash>
         </button>
         <button onClick={() => onSelect(m.id, 1)} className="rounded-lg bg-no/15 px-2.5 py-2 text-xs font-semibold text-no hover:bg-no/25 sm:px-3">
           <span className="hidden sm:inline">{m.outcomes[1]?.name} </span>
-          {cents(live?.no.ask ?? null)}
+          <Flash value={live?.no.ask}>{cents(live?.no.ask ?? null)}</Flash>
         </button>
       </div>
     </li>

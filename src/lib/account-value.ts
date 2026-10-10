@@ -35,8 +35,8 @@ export function valueAccount(cash: number, positions: { token_id: string; shares
 }
 
 // One user's account value for the top bar. Cash and shares are read fresh
-// from the database every time; only Polymarket bids are cached (30s, see
-// valuation.ts). Memoized per request so the top bar and page share it.
+// from the database every time; only Polymarket bids are cached (cacheTtl.accountPrices
+// in config, see valuation.ts). Memoized per request so the top bar and page share it.
 export const getAccountSummary = cache(async (userId: string): Promise<AccountSummary> => {
   const db = adminClient();
   const season = await currentSeasonId();

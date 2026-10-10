@@ -50,3 +50,22 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Subtle highlight on a number that just changed (components/Flash.tsx). */
+@keyframes value-flash {
+  from {
+    background-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+.value-flash {
+  animation: value-flash 1.2s ease-out;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .value-flash {
+    animation: none;
+  }
+}

@@ -1,4 +1,5 @@
 import "server-only";
+import { upstreamBackoff } from "@/config/site";
 import type { Fetched } from "./types";
 
 // Server-only HTTP + cache layer for Polymarket. The browser never calls
@@ -27,20 +28,62 @@ export class PolymarketError extends Error {
   }
 }
 
-export async function getJson(url: string, init?: RequestInit): Promise<unknown> {
-  const res = await fetch(url, {
-    ...init,
-    headers: { ...HEADERS, ...(init?.headers ?? {}) },
-    cache: "no-store",
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
+// Backoff ("circuit breaker") per endpoint, e.g. clob.polymarket.com/books.
+// After a 429, a 5xx or a network failure, calls to that endpoint are skipped
+// for 1s, 2s, 4s ... (config: upstreamBackoff) and callers serve their last
+// known data marked stale instead of hammering Polymarket. One success resets it.
+type Breaker = { failures: number; until: number };
+const breakers = new Map<string, Breaker>();
+const endpointOf = (url: URL) => `${url.host}/${url.pathname.split("/")[1] ?? ""}`;
+
+export class BackingOffError extends PolymarketError {
+  constructor(endpoint: string, ms: number) {
+    super(`backing off ${endpoint} for ${Math.ceil(ms / 1000)}s after errors`, null);
+  }
+}
+
+function recordFailure(endpoint: string) {
+  const b = breakers.get(endpoint) ?? { failures: 0, until: 0 };
+  b.failures++;
+  const wait = Math.min(upstreamBackoff.firstMs * 2 ** (b.failures - 1), upstreamBackoff.maxMs);
+  b.until = Date.now() + wait;
+  breakers.set(endpoint, b);
+}
+
+export function __resetBreakers() {
+  breakers.clear();
+}
+
+// `breaker: false` is for trade execution: it always makes the real call.
+export async function getJson(url: string, init?: RequestInit & { breaker?: boolean }): Promise<unknown> {
+  const { breaker = true, ...rest } = init ?? {};
+  const u = new URL(url);
+  const endpoint = endpointOf(u);
+  if (breaker) {
+    const b = breakers.get(endpoint);
+    if (b && b.until > Date.now()) throw new BackingOffError(endpoint, b.until - Date.now());
+  }
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      ...rest,
+      headers: { ...HEADERS, ...(rest.headers ?? {}) },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    recordFailure(endpoint); // network error or timeout
+    throw err;
+  }
   if (!res.ok) {
+    if (res.status === 429 || res.status >= 500) recordFailure(endpoint);
     let detail = "";
     try {
       detail = (await res.text()).slice(0, 200);
     } catch {}
-    throw new PolymarketError(`${res.status} from ${new URL(url).host}${new URL(url).pathname}: ${detail}`, res.status);
+    throw new PolymarketError(`${res.status} from ${u.host}${u.pathname}: ${detail}`, res.status);
   }
+  breakers.delete(endpoint);
   return res.json();
 }
 
@@ -80,7 +123,7 @@ export async function cached<T>(key: string, ttlSec: number, load: () => Promise
     return { data: value, stale: false, fetchedAt: Date.now() };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error(`[polymarket] ${key}: ${message}`);
+    if (!(err instanceof BackingOffError)) console.error(`[polymarket] ${key}: ${message}`);
     if (hit && now - hit.fetchedAt < STALE_LIMIT_MS) {
       return { data: hit.value as T, stale: true, fetchedAt: hit.fetchedAt, error: message };
     }

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { AdminTable } from "@/components/AdminTable";
 import { AdminWaiting } from "@/components/AdminWaiting";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { customTab } from "@/config/site";
 import { listEndedCustom, listUsers, listWaitingMarkets } from "@/lib/admin";
 import { emailConfigured } from "@/lib/email";

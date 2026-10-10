@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 export const dynamic = "force-dynamic";
 
 // The top bar's Portfolio and Cash, refetched on page changes. Prices come
-// from the shared 30s cache, so this never hits Polymarket per request.
+// from the shared short-lived cache, so this never hits Polymarket per request.
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });

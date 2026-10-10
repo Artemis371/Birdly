@@ -117,11 +117,12 @@ export function getBooks(tokenIds: string[]): Promise<Fetched<Record<string, Ord
   return cached(`books:${ids.join(",")}`, cacheTtl.book, () => fetchBooks(ids));
 }
 
-// Fresh book straight from the CLOB, bypassing every cache. For trade execution.
+// Fresh book straight from the CLOB, bypassing every cache and the backoff.
+// For trade execution, which must always price from the real current book.
 // GET /book returns 404 once a market has resolved; that maps to null.
 export async function getFreshBook(tokenId: string): Promise<OrderBook | null> {
   try {
-    return parseBook((await getJson(`${CLOB}/book?token_id=${encodeURIComponent(tokenId)}`)) as Raw, tokenId);
+    return parseBook((await getJson(`${CLOB}/book?token_id=${encodeURIComponent(tokenId)}`, { breaker: false })) as Raw, tokenId);
   } catch (err) {
     if ((err as { status?: number }).status === 404) return null;
     throw err;

@@ -333,16 +333,63 @@ npm run build
   (phones show Portfolio only; Cash is on the portfolio page).
 - One calculation (`src/lib/account-value.ts`) feeds all three places, and
   `src/lib/account-value.test.ts` checks they match to the cent.
-- **Caching:** Polymarket bids are cached per token for 30 seconds
-  (`src/lib/valuation.ts`), shared by every page, so each held token's book is
-  fetched at most about twice a minute per server instance no matter how many
-  pages people open. Cash and shares are always read fresh, so trades, payouts
-  and refunds show up right away. Leahys prices are always live.
+- **Caching:** Polymarket bids are cached per token for `cacheTtl.accountPrices`
+  seconds (10 by default, `src/lib/valuation.ts`), shared by every page, so each
+  held token's book is fetched at most once per window per server instance no
+  matter how many pages people open. Cash and shares are always read fresh, so
+  trades, payouts and refunds show up right away. Leahys prices are always live.
 - **If Polymarket is down:** the last known bid is used and a small amber dot
   shows next to the top bar value (plus a banner on the leaderboard and
   portfolio pages). On a server that has never fetched a token, the price of
   the last Birdly trade in it is used instead. Never an error or a zero.
 - No database migration was needed for this.
+
+## Live refresh
+
+Every interval, cache time and the idle timeout live in `src/config/site.ts`
+(`refresh`, `cacheTtl`, `upstreamBackoff`). Change a number, push, done.
+
+| What | Refreshes every | Server caches in front |
+|---|---|---|
+| Market page prices + trade panel quote preview | 5s | 2s in-memory book cache + 2s CDN |
+| Market page chart | 15s | 10s + 10s CDN |
+| Home and category grids | 20s | 15s event list, 2s books |
+| Top bar, leaderboard, portfolio page | 15s | 10s account prices |
+| Activity feed | 10s | none (database) |
+| Leahys market prices + preview | 4s | none (database), so trades show for everyone within ~4s |
+
+Rules the polling follows (`src/lib/client/usePolling.ts`, `poller.ts`, `presence.ts`):
+
+- Only while the tab is visible. Hidden tab or locked phone: nothing. Coming
+  back refreshes immediately.
+- After 5 minutes with no mouse, touch or keyboard activity it pauses and shows
+  "Paused, tap to resume". Any interaction resumes instantly.
+- A failed refresh backs off (x2, x4 ... up to 60s) and keeps showing the last
+  data. On the server, a 429/5xx/timeout from a Polymarket endpoint makes us skip
+  that endpoint for 1s, 2s, 4s ... up to 60s, serving last known data marked stale.
+- Everyone watching the same market shares one upstream request (in-memory
+  cache with in-flight de-duplication, plus the CDN cache across servers).
+- Trade execution is unchanged and exempt from the backoff: it always prices
+  from a fresh order book.
+- Links prefetch on hover/touch only (`src/components/Link.tsx`). Viewport
+  prefetching cost one request per visible link and re-ran after every refresh.
+
+**Watching Vercel usage (Hobby is free but hard-capped).** Vercel doesn't
+expose Hobby usage through an API we can show on the admin page. Look here
+instead: Vercel dashboard, **Usage** in the sidebar. It shows month-to-date
+numbers against the Hobby limits. Worry when, partway through the 30 days, any
+of these is ahead of the calendar (for example over 50% by day 10):
+
+| Section | Metric | Hobby limit | Expected with 10 people |
+|---|---|---|---|
+| Functions | Function Invocations | 1,000,000 | ~260k at 1 hr/day each, ~520k at 2 hr/day |
+| Functions | Active CPU | 4 CPU-hrs | ~1-2 CPU-hrs (an estimate) |
+| CDN | CDN Requests | 1,000,000 | similar to invocations plus static files |
+| Functions | Provisioned Memory | 360 GB-hrs | well under |
+
+If you go over, Vercel pauses that feature until 30 days have passed. To cut
+usage, raise the numbers in `refresh` (prices 5s to 8s roughly halves the
+biggest cost) or lower `idleTimeoutMs`.
 
 ## How it works (market data)
 

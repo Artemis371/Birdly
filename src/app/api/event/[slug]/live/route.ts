@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { cacheTtl } from "@/config/site";
 import { json } from "@/lib/api-response";
 import { getBooks, getEvent } from "@/lib/polymarket/api";
 import { orderMarkets, toLive, type LiveResponse } from "@/lib/polymarket/display";
@@ -18,7 +19,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/event/[slug
       stale: ev.stale || books.stale,
       markets: markets.map((m) => toLive(m, books.data)),
     };
-    return json(body, { sMaxAge: 5 });
+    return json(body, { sMaxAge: cacheTtl.cdnLive });
   } catch {
     return json({ error: "upstream_unavailable" }, { status: 503 });
   }

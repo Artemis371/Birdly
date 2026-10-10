@@ -1,9 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/Link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Flash } from "@/components/Flash";
 import { customMarketTimeZone, refresh, trading } from "@/config/site";
+import { fetchJson, usePolling } from "@/lib/client/usePolling";
 import { formatInZone } from "@/lib/tz";
 import { ConfirmSheet, QUOTE_ERRORS, QuoteRows, type Confirming, type OkQuote } from "@/components/markets/TradePanel";
 import { PriceChart } from "@/components/markets/PriceChart";
@@ -19,21 +21,23 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
   const [selected, setSelected] = useState(() => market.prices.indexOf(Math.max(...market.prices)));
   const [stale, setStale] = useState(false);
 
-  useEffect(() => {
-    if (market.status !== "open") return;
-    const id = setInterval(async () => {
-      if (document.visibilityState !== "visible") return;
+  // Prices straight from the database (never cached), every
+  // refresh.customLiveMs while the person is here, so a trade by anyone shows
+  // up for everyone watching within a few seconds.
+  usePolling(
+    async (signal) => {
       try {
-        const res = await fetch(`/api/custom/${market.slug}/live`);
-        if (!res.ok) throw new Error();
-        setPrices((await res.json()).prices);
+        const body = await fetchJson<{ prices: number[] }>(`/api/custom/${market.slug}/live`, signal);
+        setPrices(body.prices);
         setStale(false);
-      } catch {
-        setStale(true);
+      } catch (err) {
+        if (!signal.aborted) setStale(true);
+        throw err;
       }
-    }, refresh.livePricesMs);
-    return () => clearInterval(id);
-  }, [market.slug, market.status]);
+    },
+    refresh.customLiveMs,
+    { enabled: market.status === "open" },
+  );
 
   const resolved = market.status === "resolved";
   const cancelled = market.status === "cancelled";
@@ -100,7 +104,9 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
                     <div className="text-xs text-accent">You hold {fmtShares(viewer.holdings[customTokenId(market.id, i)])} shares</div>
                   ) : null}
                 </button>
-                <span className="tabular w-14 text-right text-lg font-bold">{cancelled ? "--" : resolved ? (i === market.winningIndex ? "100%" : "0%") : pct(prices[i])}</span>
+                <Flash value={prices[i]} className="tabular w-14 text-right text-lg font-bold">
+                  {cancelled ? "--" : resolved ? (i === market.winningIndex ? "100%" : "0%") : pct(prices[i])}
+                </Flash>
                 {!blocked ? (
                   <button
                     onClick={() => {
@@ -109,7 +115,7 @@ export function CustomMarketView({ market, viewer, holders }: { market: CustomMa
                     }}
                     className="shrink-0 rounded-lg bg-yes/15 px-3 py-2 text-xs font-semibold text-yes hover:bg-yes/25"
                   >
-                    Buy {cents(prices[i])}
+                    Buy <Flash value={cents(prices[i])}>{cents(prices[i])}</Flash>
                   </button>
                 ) : null}
               </li>
@@ -203,6 +209,18 @@ function CustomTradePanel({
       clearTimeout(t);
     };
   }, [reqKey, market.slug, index, mode, value]);
+
+  // Keep the preview current while an amount is entered. Preview only:
+  // execution re-prices against the locked market state in the database.
+  usePolling(
+    async (signal) => {
+      const key = reqKey;
+      const body = await fetchJson<{ quote: Quote | null }>(`/api/custom/${market.slug}/live?i=${index}&side=${mode}&amount=${value}`, signal);
+      setPreview((prev) => (prev?.key === key ? { key: key as string, quote: body.quote } : prev));
+    },
+    refresh.customLiveMs,
+    { enabled: reqKey !== null && !confirming },
+  );
 
   async function requestQuote() {
     setBusy(true);

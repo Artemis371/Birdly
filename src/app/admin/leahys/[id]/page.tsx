@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { AddOutcome } from "@/components/custom/AddOutcome";
 import { CustomMarketForm } from "@/components/custom/CustomMarketForm";

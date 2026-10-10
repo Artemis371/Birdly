@@ -38,20 +38,43 @@ export const trading = {
   maxPrice: 0.999,
 } as const;
 
+// How often things refresh. Every number here can be tuned without touching
+// code. Polling only runs while the tab is visible and the person isn't idle.
+// Usage math behind these numbers: see "Live refresh" in the README.
 export const refresh = {
-  // Browser polling intervals (ms) for the market page.
-  livePricesMs: 15_000,
-  chartMs: 30_000,
+  // Browser polling intervals (ms).
+  livePricesMs: 5_000, // market page prices + trade panel quote preview
+  chartMs: 15_000, // market page chart
+  gridMs: 20_000, // home page and category grids
+  accountMs: 15_000, // top bar Portfolio/Cash, leaderboard, portfolio page
+  activityMs: 10_000, // activity feed (top bar refreshes in the same request)
+  customLiveMs: 4_000, // Leahys market prices + quote preview
+  // Stop polling after this long with no mouse, touch or keyboard activity.
+  idleTimeoutMs: 5 * 60_000,
+  // After a failed refresh, wait interval x 2, x 4, ... up to this cap.
+  maxBackoffMs: 60_000,
 } as const;
 
 export const cacheTtl = {
-  // Server-side cache lifetimes (seconds).
-  eventList: 60,
-  event: 20,
-  book: 5,
-  history: 30,
+  // Server-side in-memory cache lifetimes (seconds), shared by everyone on a
+  // server instance. Many people watching the same market share one request.
+  eventList: 15, // home grids
+  event: 20, // event/market details (prices come from books, not this)
+  book: 2, // order books: live prices, quote previews, card prices
+  history: 10, // chart history
   tags: 3600,
+  accountPrices: 10, // bids used for Portfolio values (top bar, leaderboard, portfolio)
+  // Vercel CDN cache (s-maxage, seconds) on our public API routes. Stacks on
+  // top of the in-memory cache, so keep both short for prices.
+  cdnLive: 2, // /api/event/[slug]/live
+  cdnQuote: 2, // /api/quote (preview only; execution always re-prices fresh)
+  cdnHistory: 10, // /api/history
 } as const;
+
+// Backoff when Polymarket errors or rate-limits us (HTTP 429 or 5xx, timeouts):
+// skip calls for 1s, then 2s, 4s ... up to this cap, serving last known data
+// marked stale. Trade execution is exempt and always fetches a fresh book.
+export const upstreamBackoff = { firstMs: 1_000, maxMs: 60_000 } as const;
 
 // Category chips on the home page. `slug` is the Polymarket tag slug used to
 // filter events. Unverified guesses until checked against GET /tags; edit freely.

@@ -1,4 +1,5 @@
-import Link from "next/link";
+import Link from "@/components/Link";
+import { Flash } from "@/components/Flash";
 import { compactUsd, cents, pct, timeLeft } from "@/lib/format";
 import { displayProb, orderMarkets } from "@/lib/polymarket/display";
 import type { OrderBook, PolyEvent } from "@/lib/polymarket/types";
@@ -38,7 +39,7 @@ export function EventCard({ ev, books }: { ev: PolyEvent; books: Record<string, 
                   i === 0 ? "bg-yes/15 text-yes hover:bg-yes/25" : "bg-no/15 text-no hover:bg-no/25"
                 }`}
               >
-                Buy {o.name} {cents(books[o.tokenId]?.bestAsk ?? o.price)}
+                Buy {o.name} <Flash value={books[o.tokenId]?.bestAsk ?? o.price}>{cents(books[o.tokenId]?.bestAsk ?? o.price)}</Flash>
               </Link>
             ))}
           </div>
@@ -48,9 +49,9 @@ export function EventCard({ ev, books }: { ev: PolyEvent; books: Record<string, 
               <li key={m.id}>
                 <Link href={`${href}?m=${m.id}`} className="flex items-center gap-2 rounded-lg py-1 text-sm hover:bg-surface-2">
                   <span className="min-w-0 flex-1 truncate text-text/90">{m.label}</span>
-                  <span className="tabular w-12 text-right font-semibold">
+                  <Flash value={pct(displayProb(books[m.outcomes[0].tokenId], m.outcomes[0].price))} className="tabular w-12 text-right font-semibold">
                     {pct(displayProb(books[m.outcomes[0].tokenId], m.outcomes[0].price))}
-                  </span>
+                  </Flash>
                   <span className="max-w-16 truncate rounded-md bg-yes/15 px-2 py-0.5 text-xs font-semibold text-yes">{m.outcomes[0].name}</span>
                   <span className="max-w-16 truncate rounded-md bg-no/15 px-2 py-0.5 text-xs font-semibold text-no">{m.outcomes[1]?.name}</span>
                 </Link>
@@ -86,7 +87,9 @@ function Gauge({ p }: { p: number | null }) {
           strokeDasharray={`${circ * v} ${circ}`}
         />
       </svg>
-      <span className="tabular absolute inset-x-0 bottom-0 text-center text-xs font-bold leading-none">{pct(p)}</span>
+      <Flash value={pct(p)} className="tabular absolute inset-x-0 bottom-0 text-center text-xs font-bold leading-none">
+        {pct(p)}
+      </Flash>
     </div>
   );
 }

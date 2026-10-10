@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/Link";
 import { Suspense } from "react";
 import { AccountChip } from "@/components/AccountChip";
 import { BottomNav } from "@/components/BottomNav";

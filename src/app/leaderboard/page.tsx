@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { AutoRefresh } from "@/components/AutoRefresh";
+import { Flash } from "@/components/Flash";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { refresh } from "@/config/site";
 import { getCurrentUser } from "@/lib/auth/session";
 import { usd } from "@/lib/format";
 import { loadLeaderboard } from "@/lib/leaderboard";
@@ -17,6 +20,7 @@ export default async function LeaderboardPage() {
 
   return (
     <div className="mx-auto max-w-2xl">
+      <AutoRefresh ms={refresh.accountMs} />
       <h1 className="text-2xl font-bold">Leaderboard</h1>
       <p className="mb-4 text-sm text-muted">
         Ranked by Portfolio value <InfoTooltip label="What is Portfolio value?" />, which is cash plus open positions at their current sell price. Everyone started with{" "}
@@ -41,7 +45,9 @@ export default async function LeaderboardPage() {
                     {r.userId === user.id ? <span className="ml-1 text-xs text-accent">(you)</span> : null}
                   </div>
                   <div className="shrink-0 text-right">
-                    <span className="tabular font-semibold">{usd(r.total)}</span>{" "}
+                    <Flash value={r.total} className="tabular font-semibold">
+                      {usd(r.total)}
+                    </Flash>{" "}
                     <span className={`tabular text-xs font-medium ${tone}`}>
                       {r.returnPct > 0 ? "+" : r.returnPct < 0 ? "−" : ""}
                       {Math.abs(r.returnPct * 100).toFixed(1)}%
