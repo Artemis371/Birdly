@@ -89,8 +89,10 @@ export const categories = [
   { label: "World", slug: "world" },
 ] as const;
 
-// Our own private markets tab (members only). Shown second in the category row.
-export const customTab = { label: "Leahys", slug: "leahys" } as const;
+// Custom market tabs (Leahys, Rooneys, ...) live in the database and are
+// managed on the admin page. This is only used if that table is missing
+// (migration 0007 not run yet): one Leahys tab with every custom market.
+export const fallbackCustomCategory = { label: "Leahys", slug: "leahys" } as const;
 
 // Time zone for custom ("Leahys") market end dates: what the admin types in
 // the edit form and what everyone sees on market pages.

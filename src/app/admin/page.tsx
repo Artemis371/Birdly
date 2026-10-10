@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { AdminTable } from "@/components/AdminTable";
 import { AdminWaiting } from "@/components/AdminWaiting";
 import Link from "@/components/Link";
-import { customTab } from "@/config/site";
 import { listEndedCustom, listUsers, listWaitingMarkets } from "@/lib/admin";
 import { emailConfigured } from "@/lib/email";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -23,7 +22,7 @@ export default async function AdminPage() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">Admin</h1>
         <Link href="/admin/leahys" className="rounded-xl bg-surface-2 px-4 py-2 text-sm font-semibold hover:bg-line">
-          {customTab.label} markets
+          Custom markets
         </Link>
       </div>
       <AdminWaiting markets={waiting} custom={endedCustom} emailOn={emailConfigured()} />

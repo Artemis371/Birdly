@@ -3,8 +3,10 @@ import { AutoRefresh } from "@/components/AutoRefresh";
 import { ErrorPanel, StaleBanner } from "@/components/StaleBanner";
 import { EventCard, cardTokenIds } from "@/components/markets/EventCard";
 import { CustomMarketCard } from "@/components/custom/CustomMarketCard";
-import { categories, customTab, refresh } from "@/config/site";
+import { refresh } from "@/config/site";
 import { getCurrentUser } from "@/lib/auth/session";
+import { categoryFilter, listCategories } from "@/lib/custom/categories";
+import { homeChips } from "@/lib/custom/chips";
 import { countCustomDrafts, listPublishedCustom } from "@/lib/custom/markets";
 import type { CustomMarket } from "@/lib/custom/types";
 import { SORTS, type SortKey, getBooks, listEvents, searchEvents, type EventPage } from "@/lib/polymarket/api";
@@ -24,19 +26,20 @@ export default async function Home(props: PageProps<"/">) {
   const sort: SortKey = SORTS.some((s) => s.key === sortParam) ? sortParam : "trending";
   const cursor = first(sp.cursor) || undefined;
 
-  // The custom-markets tab only exists for signed-in members.
+  // Custom-market tabs (Leahys, Rooneys, ...) only exist for signed-in members.
   let user = null;
   try {
     user = await getCurrentUser();
   } catch {}
-  const showCustom = !q && !!user && tag === customTab.slug;
-  const chips = user ? [categories[0], { label: customTab.label, slug: customTab.slug }, ...categories.slice(1)] : [...categories];
+  const customCats = user ? await listCategories() : [];
+  const activeCustom = !q && user ? customCats.find((c) => c.slug === tag) : undefined;
+  const chips = homeChips(!!user, customCats);
 
-  if (showCustom && user) {
+  if (activeCustom && user) {
     let custom: CustomMarket[] | null = null;
     let drafts = 0;
     try {
-      [custom, drafts] = await Promise.all([listPublishedCustom(), user.isAdmin ? countCustomDrafts() : Promise.resolve(0)]);
+      [custom, drafts] = await Promise.all([listPublishedCustom(categoryFilter(activeCustom)), user.isAdmin ? countCustomDrafts() : Promise.resolve(0)]);
     } catch {
       custom = null;
     }
@@ -54,7 +57,7 @@ export default async function Home(props: PageProps<"/">) {
               <span className="font-semibold text-accent">Admin:</span>{" "}
               {drafts ? `${drafts} draft${drafts === 1 ? "" : "s"} not published yet.` : "Create, publish and resolve these markets."}
             </span>
-            <span className="shrink-0 font-semibold text-accent">Manage {customTab.label} markets →</span>
+            <span className="shrink-0 font-semibold text-accent">Manage custom markets →</span>
           </Link>
         ) : null}
         {!custom ? (
@@ -74,7 +77,7 @@ export default async function Home(props: PageProps<"/">) {
 
   let page: Fetched<EventPage> | null = null;
   try {
-    page = q ? await searchEvents(q) : await listEvents({ sort, tag: tag === customTab.slug ? undefined : tag, cursor });
+    page = q ? await searchEvents(q) : await listEvents({ sort, tag: customCats.some((c) => c.slug === tag) ? undefined : tag, cursor });
   } catch {
     page = null;
   }

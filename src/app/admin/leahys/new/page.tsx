@@ -3,6 +3,7 @@ import Link from "@/components/Link";
 import { notFound, redirect } from "next/navigation";
 import { CustomMarketForm } from "@/components/custom/CustomMarketForm";
 import { getCurrentUser } from "@/lib/auth/session";
+import { listCategories } from "@/lib/custom/categories";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "New market" };
@@ -17,7 +18,7 @@ export default async function NewCustomPage() {
         ← Back
       </Link>
       <h1 className="mb-4 text-2xl font-bold">New market</h1>
-      <CustomMarketForm />
+      <CustomMarketForm categories={await listCategories()} />
     </div>
   );
 }

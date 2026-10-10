@@ -176,6 +176,14 @@ GitHub, paste into the SQL Editor, **Run**. Safe to re-run. If you ever change
 `maxTradeUsd` in `src/config/site.ts`, also run
 `update public.app_settings set value = <new max> where key = 'max_trade_usd';`
 
+### 4b. Run migration 0007
+
+Custom market tabs (Leahys, Rooneys, more later) plus the 2026 IRONMAN drafts.
+Copy `supabase/migrations/0007_custom_categories.sql` from the **Raw** view on
+GitHub, paste into the SQL Editor of the BIRDLY project, **Run**. Safe to
+re-run. The result table at the end says what it moved and created (or, if the
+"FJ manual" market didn't match exactly one title, lists every title instead).
+
 ### 5. Reminder emails (Resend)
 
 When a Leahys market passes its end date, trading closes and the daily cron
@@ -196,11 +204,15 @@ emails you once, with a link straight to its resolve page.
 Without these, everything still works: ended markets show up under
 **Admin -> Waiting to pay out** with a note that emails are off.
 
-## Leahys markets (custom markets)
+## Custom markets (Leahys, Rooneys, ...)
 
-- Members-only: logged-out visitors don't see the tab, the cards, or the pages
-  (they get a plain 404). Drafts are visible to admins only. The tab name lives
-  in `src/config/site.ts` (`customTab`).
+- Members-only: logged-out visitors don't see the tabs, the cards, or the pages
+  (they get a plain 404). Drafts are visible to admins only.
+- **Tabs are data, not code.** Admin, Custom markets: add a tab, rename it
+  (its link stays the same) or reorder with the arrows. Chips show right after
+  "Trending" in that order. Each market belongs to one tab; change it with the
+  "Tab" picker on the market's row at any time, even after trades or after it
+  resolves. Moving changes nothing else (prices, positions, history, end date).
 - **Pricing: LMSR automated market maker.** Every outcome starts at equal odds
   (50/50, or 11% each with 9 outcomes); buying an outcome raises its price and
   lowers the others; prices always add up to 100%. Fills are instant, using

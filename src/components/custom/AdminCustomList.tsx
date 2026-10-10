@@ -2,12 +2,12 @@
 
 import Link from "@/components/Link";
 import { useState } from "react";
-import type { CustomMarket } from "@/lib/custom/types";
+import type { CustomCategory, CustomMarket } from "@/lib/custom/types";
 import { compactUsd } from "@/lib/format";
 import { customMarketTimeZone } from "@/config/site";
 import { formatInZone } from "@/lib/tz";
 
-export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
+export function AdminCustomList({ markets, categories }: { markets: CustomMarket[]; categories: CustomCategory[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +31,21 @@ export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
     }
   }
 
+  // Moving only changes which tab the market shows under. Works any time.
+  async function moveTo(m: CustomMarket, categoryId: number) {
+    setBusy(m.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/custom/${m.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "move", categoryId }) });
+      const d = await res.json();
+      if (!res.ok) return setError(`${m.title}: ${d.error}`);
+      window.location.reload();
+    } finally {
+      setBusy(null);
+    }
+  }
+  const canMove = categories.length > 1 && categories[0].id > 0;
+
   const groups: [string, CustomMarket[]][] = [
     ["Needs a winner", markets.filter((m) => m.status === "open" && m.ended)],
     ["Drafts", markets.filter((m) => m.status === "draft")],
@@ -53,7 +68,24 @@ export function AdminCustomList({ markets }: { markets: CustomMarket[] }) {
                     {m.outcomes.length} outcomes · ends {formatInZone(m.endAt, customMarketTimeZone.zone)} · liquidity {m.liquidity.toLocaleString()} · {compactUsd(m.volume)} traded
                     {m.status === "resolved" ? ` · winner: ${m.outcomes[m.winningIndex ?? 0]}` : m.status === "cancelled" ? " · cancelled, refunded" : ""}
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                    {canMove ? (
+                      <label className="flex items-center gap-1 text-muted">
+                        Tab
+                        <select
+                          value={m.categoryId ?? categories[0].id}
+                          disabled={busy === m.id}
+                          onChange={(e) => moveTo(m, Number(e.target.value))}
+                          className="rounded-lg border border-line bg-bg px-2 py-2 text-[16px] text-text sm:text-xs"
+                        >
+                          {categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     {m.status === "draft" ? (
                       <button onClick={() => act(m, "publish")} disabled={busy === m.id} className="rounded-lg bg-accent px-3 py-2 font-semibold text-bg disabled:opacity-50">
                         Publish

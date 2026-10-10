@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
 import { json } from "@/lib/api-response";
 import { readJson, requireAdmin } from "@/lib/auth/guard";
-import { friendly, saveCustomMarket } from "@/lib/custom/admin-actions";
+import { friendly, moveCustomMarket, saveCustomMarket } from "@/lib/custom/admin-actions";
 import { getCustomById } from "@/lib/custom/markets";
 import { adminClient } from "@/lib/supabase/admin";
 
-// actions: save | publish | delete | resolve | cancel | add_outcome
+// actions: save | publish | delete | resolve | cancel | add_outcome | move
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/custom/[id]">) {
   const admin = await requireAdmin();
   if (admin instanceof Response) return admin;
@@ -14,6 +14,14 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/custo
   if (!m) return json({ error: "That market wasn't found." }, { status: 404 });
   const body = await readJson(req);
   const db = adminClient();
+
+  // Moving between categories is allowed at any time, even on closed markets.
+  if (body.action === "move") {
+    const categoryId = Number(body.categoryId);
+    if (!Number.isInteger(categoryId) || categoryId <= 0) return json({ error: "Pick a category." }, { status: 400 });
+    const r = await moveCustomMarket(admin.id, id, categoryId);
+    return r.ok ? json(r) : json(r, { status: 400 });
+  }
 
   const closed = m.status === "resolved" || m.status === "cancelled";
   if (closed && body.action !== "resolve" && body.action !== "cancel") {

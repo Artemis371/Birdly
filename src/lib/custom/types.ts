@@ -1,4 +1,4 @@
-// Shared (client-safe) types for custom "Leahys" markets.
+// Shared (client-safe) types for custom markets (Leahys, Rooneys, ...).
 export type CustomStatus = "draft" | "open" | "resolved" | "cancelled";
 
 export type CustomMarket = {
@@ -21,7 +21,11 @@ export type CustomMarket = {
   ended: boolean; // past end date
   hasTrades: boolean;
   volume: number;
+  categoryId: number | null; // null only before migration 0007 is run
 };
+
+// A members-only tab of custom markets (Leahys, Rooneys, ...), managed by admins.
+export type CustomCategory = { id: number; slug: string; label: string; sortOrder: number };
 
 export const CUSTOM_PREFIX = "custom:";
 export const isCustomToken = (t: string) => t.startsWith(CUSTOM_PREFIX);

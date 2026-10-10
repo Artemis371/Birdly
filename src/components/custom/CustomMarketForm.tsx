@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { customMarketTimeZone } from "@/config/site";
 import { costToMove } from "@/lib/lmsr/lmsr";
 import { formatInZone, isoToZonedInput, zonedInputToIso } from "@/lib/tz";
-import type { CustomMarket } from "@/lib/custom/types";
+import type { CustomCategory, CustomMarket } from "@/lib/custom/types";
 import { DEFAULT_LIQUIDITY } from "@/lib/custom/validate";
 import { usd } from "@/lib/format";
 
@@ -13,7 +13,8 @@ import { usd } from "@/lib/format";
 // no matter what time zone the admin's device is in.
 const TZ = customMarketTimeZone.zone;
 
-export function CustomMarketForm({ market }: { market?: CustomMarket }) {
+// `categories` is only passed when creating; existing markets move from the list page.
+export function CustomMarketForm({ market, categories }: { market?: CustomMarket; categories?: CustomCategory[] }) {
   const locked = !!market?.hasTrades; // only description + end date editable
   const [liquidity, setLiquidity] = useState(String(market?.liquidity ?? DEFAULT_LIQUIDITY));
   const [busy, setBusy] = useState(false);
@@ -37,6 +38,7 @@ export function CustomMarketForm({ market }: { market?: CustomMarket }) {
       outcomes: String(fd.get("outcomes") ?? "").split("\n"),
       endAt: endIso ?? "",
       liquidity: fd.get("liquidity"),
+      categoryId: fd.get("categoryId") ? Number(fd.get("categoryId")) : undefined,
     };
     if (mode === "publish" && !window.confirm("Publish now? Trading opens immediately at equal odds.")) return;
     setBusy(true);
@@ -65,6 +67,18 @@ export function CustomMarketForm({ market }: { market?: CustomMarket }) {
     <form className="space-y-4" onSubmit={(e) => submit(e, submitMode.current)}>
       {locked ? (
         <p className="rounded-lg bg-warn/10 px-3 py-2 text-sm text-warn">This market has trades, so only the description and end date can change.</p>
+      ) : null}
+      {!market && categories?.length && categories[0].id > 0 ? (
+        <div>
+          <label className="mb-1 block text-sm font-medium" htmlFor="categoryId">Tab</label>
+          <select id="categoryId" name="categoryId" defaultValue={categories[0].id} className={input}>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </div>
       ) : null}
       <div>
         <label className="mb-1 block text-sm font-medium" htmlFor="title">Title</label>

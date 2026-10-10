@@ -123,7 +123,7 @@ describe("cancel_custom_market", () => {
 
 describe("0004 seeds and re-runs", () => {
   it("drafts end at 11:59 PM Hawaii time", async () => {
-    const rows = (await db.query<{ slug: string; end_utc: string }>("select slug, to_char(end_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS') as end_utc from public.custom_markets where status = 'draft' order by slug")).rows;
+    const rows = (await db.query<{ slug: string; end_utc: string }>("select slug, to_char(end_at at time zone 'UTC', 'YYYY-MM-DD HH24:MI:SS') as end_utc from public.custom_markets where status = 'draft' and slug not like 'ironman-2026-%' order by slug")).rows;
     expect(rows).toEqual([
       { slug: "beahy-harry-mclary", end_utc: "2028-01-01 09:59:59" },
       { slug: "hannahs-next-job", end_utc: "2027-04-01 09:59:59" },

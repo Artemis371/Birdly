@@ -26,6 +26,7 @@ function market(over: Partial<CustomMarket> = {}): CustomMarket {
     ended: false,
     hasTrades: false,
     volume: 0,
+    categoryId: 1,
     ...over,
   };
 }

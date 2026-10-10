@@ -48,7 +48,7 @@ export function AdminWaiting({ markets, custom, emailOn }: { markets: WaitingMar
       <div className="mb-2 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Waiting to pay out</h2>
-          <p className="text-xs text-muted">Ended Leahys markets that need a winner, and closed Polymarket markets someone still holds (checked daily and when holders open their portfolio).</p>
+          <p className="text-xs text-muted">Ended custom markets that need a winner, and closed Polymarket markets someone still holds (checked daily and when holders open their portfolio).</p>
         </div>
         <button onClick={checkNow} disabled={busy} className="shrink-0 rounded-lg bg-surface-2 px-3 py-2 text-sm font-medium hover:bg-line disabled:opacity-50">
           {busy ? "Checking…" : "Check now"}
@@ -62,7 +62,7 @@ export function AdminWaiting({ markets, custom, emailOn }: { markets: WaitingMar
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{m.title}</div>
-                  <div className="text-xs text-muted">Leahys market · {m.holders} holder{m.holders === 1 ? "" : "s"}</div>
+                  <div className="text-xs text-muted">Custom market · {m.holders} holder{m.holders === 1 ? "" : "s"}</div>
                 </div>
                 <Link href={`/admin/leahys/${m.id}/resolve`} className="shrink-0 rounded-lg bg-warn/20 px-3 py-1.5 text-xs font-semibold text-warn">
                   Pick winner

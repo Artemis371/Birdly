@@ -46,7 +46,8 @@ async function tradeCustom(user: string, id: string, idx: number, side: "buy" | 
 
 describe("seeded drafts", () => {
   it("creates the four drafts with equal starting odds", async () => {
-    const rows = (await db.query<Row & { slug: string }>("select * from public.custom_markets order by slug")).rows;
+    // (0007 adds the IRONMAN drafts in Rooneys; those are covered in categories.db.test.ts.)
+    const rows = (await db.query<Row & { slug: string }>("select * from public.custom_markets where slug not like 'ironman-2026-%' order by slug")).rows;
     expect(rows.map((r) => r.slug)).toEqual(["beahy-harry-mclary", "beahy-other-leg", "hannahs-next-job", "liam-garage-flake"]);
     for (const r of rows) {
       expect(r.status).toBe("draft");
@@ -61,7 +62,7 @@ describe("seeded drafts", () => {
     const sql = readFileSync(join(__dirname, "..", "..", "supabase", "migrations", "0003_custom_markets.sql"), "utf8");
     await db.exec(sql);
     await db.exec(sql);
-    expect((await db.query("select * from public.custom_markets")).rows).toHaveLength(4);
+    expect((await db.query("select * from public.custom_markets where slug not like 'ironman-2026-%'")).rows).toHaveLength(4);
     expect((await get("liam-garage-flake")).status).toBe("open");
   });
 });

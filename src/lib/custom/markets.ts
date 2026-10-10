@@ -20,9 +20,12 @@ type Row = {
   resolved_at: string | null;
   cancelled_at: string | null;
   notify_sent_at: string | null;
+  category_id?: number | null;
 };
 
-const COLS = "id, slug, title, description, rules, outcomes, q, liquidity, end_at, status, winning_index, published_at, resolved_at, cancelled_at, notify_sent_at";
+// "*" rather than a column list so this keeps working whether or not
+// migration 0007 (category_id) has been run yet.
+const COLS = "*";
 
 async function volumes(ids: string[]): Promise<Map<string, number>> {
   const out = new Map<string, number>();
@@ -63,6 +66,7 @@ function toMarket(r: Row, volume: number | undefined): CustomMarket {
     ended: Date.parse(r.end_at) <= Date.now(),
     hasTrades: (volume ?? 0) > 0,
     volume: volume ?? 0,
+    categoryId: r.category_id ?? null,
   };
 }
 
@@ -71,9 +75,12 @@ async function withVolumes(rows: Row[]): Promise<CustomMarket[]> {
   return rows.map((r) => toMarket(r, v.get(r.id)));
 }
 
-// Published markets for the Leahys tab: open first (ending soonest), then resolved.
-export async function listPublishedCustom(): Promise<CustomMarket[]> {
-  const { data, error } = await adminClient().from("custom_markets").select(COLS).neq("status", "draft").order("end_at");
+// Published markets for one category tab: open first (ending soonest), then
+// resolved. categoryId null = every category (only before migration 0007).
+export async function listPublishedCustom(categoryId: number | null): Promise<CustomMarket[]> {
+  let query = adminClient().from("custom_markets").select(COLS).neq("status", "draft");
+  if (categoryId !== null) query = query.eq("category_id", categoryId);
+  const { data, error } = await query.order("end_at");
   if (error) throw new Error(error.message);
   const ms = await withVolumes((data ?? []) as Row[]);
   const closed = (m: CustomMarket) => Number(m.status === "resolved" || m.status === "cancelled");
