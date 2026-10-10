@@ -325,6 +325,25 @@ npm run build
   members-only. On phones, a bottom tab bar gets you to Markets, Leaders,
   Activity and Portfolio.
 
+## Portfolio value (top bar, leaderboard, portfolio page)
+
+- **Portfolio** = cash + what your open positions would sell for right now
+  (real best bid for Polymarket, current price for Leahys markets, each
+  position rounded down to the cent). The top bar shows Portfolio and Cash
+  (phones show Portfolio only; Cash is on the portfolio page).
+- One calculation (`src/lib/account-value.ts`) feeds all three places, and
+  `src/lib/account-value.test.ts` checks they match to the cent.
+- **Caching:** Polymarket bids are cached per token for 30 seconds
+  (`src/lib/valuation.ts`), shared by every page, so each held token's book is
+  fetched at most about twice a minute per server instance no matter how many
+  pages people open. Cash and shares are always read fresh, so trades, payouts
+  and refunds show up right away. Leahys prices are always live.
+- **If Polymarket is down:** the last known bid is used and a small amber dot
+  shows next to the top bar value (plus a banner on the leaderboard and
+  portfolio pages). On a server that has never fetched a token, the price of
+  the last Birdly trade in it is used instead. Never an error or a zero.
+- No database migration was needed for this.
+
 ## How it works (market data)
 
 - **The browser never calls Polymarket.** Pages and `/api/*` routes call

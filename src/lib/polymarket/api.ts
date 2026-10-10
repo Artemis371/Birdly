@@ -91,7 +91,9 @@ export function getEvent(slug: string): Promise<Fetched<PolyEvent | null>> {
 
 // POST /books. Live behavior: unknown/resolved tokens are silently dropped and
 // response order doesn't match request order, so we key by asset_id.
-async function fetchBooks(tokenIds: string[]): Promise<Record<string, OrderBook>> {
+// Uncached and throws on failure; account valuation (lib/valuation.ts) keeps
+// its own per-token cache on top of this.
+export async function fetchBooks(tokenIds: string[]): Promise<Record<string, OrderBook>> {
   const out: Record<string, OrderBook> = {};
   for (let i = 0; i < tokenIds.length; i += 50) {
     const chunk = tokenIds.slice(i, i + 50);

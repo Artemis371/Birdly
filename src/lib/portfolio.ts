@@ -1,6 +1,7 @@
 import "server-only";
 import { trading } from "@/config/site";
 import { isCustomToken } from "@/lib/custom/types";
+import { positionValue, valueAccount } from "@/lib/account-value";
 import { markPrices } from "@/lib/valuation";
 import { adminClient } from "@/lib/supabase/admin";
 import { currentSeasonId } from "@/lib/trading/deps";
@@ -45,6 +46,7 @@ export type Portfolio = {
   pnl: number;
   pnlPct: number;
   pricesStale: boolean;
+  pricesAsOf: number | null;
   trades: TradeView[];
   history: { day: string; total: number }[];
 };
@@ -60,7 +62,7 @@ export function valuePositions(
     const shares = Number(r.shares);
     const costBasis = Number(r.cost_basis);
     const bid = marks[r.token_id] ?? null;
-    const value = Math.floor(shares * (bid ?? 0) * 100) / 100;
+    const value = positionValue(shares, bid);
     const pnl = Math.round((value - costBasis) * 100) / 100;
     return {
       tokenId: r.token_id,
@@ -106,10 +108,9 @@ export async function loadPortfolio(userId: string): Promise<Portfolio> {
 
   const cash = Number(bal.data?.cash ?? 0);
   const rows = (pos.data ?? []) as unknown as Parameters<typeof valuePositions>[0];
-  const { prices: marks, stale: pricesStale } = rows.length ? await markPrices(rows.map((r) => r.token_id)) : { prices: {}, stale: false };
+  const { prices: marks, stale: pricesStale, asOf: pricesAsOf } = rows.length ? await markPrices(rows.map((r) => r.token_id)) : { prices: {}, stale: false, asOf: null };
   const positions = valuePositions(rows, marks).sort((a, b) => b.value - a.value);
-  const positionsValue = Math.round(positions.reduce((s, p) => s + p.value, 0) * 100) / 100;
-  const total = Math.round((cash + positionsValue) * 100) / 100;
+  const { positionsValue, total } = valueAccount(cash, rows, marks);
 
   // Lazily record today's snapshot for the account-value chart (only with live prices).
   if (!pricesStale) {
@@ -129,6 +130,7 @@ export async function loadPortfolio(userId: string): Promise<Portfolio> {
     pnl: Math.round((total - trading.startingBalance) * 100) / 100,
     pnlPct: (total - trading.startingBalance) / trading.startingBalance,
     pricesStale,
+    pricesAsOf,
     trades: ((trades.data ?? []) as unknown as Array<{ id: number; kind: TradeView["kind"]; outcome_name: string; shares: string; price: string; amount: string; created_at: string; markets: { label: string; event_slug: string; source: string } | null }>).map((t) => ({
       id: t.id,
       kind: t.kind,

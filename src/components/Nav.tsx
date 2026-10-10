@@ -1,9 +1,26 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { AccountChip } from "@/components/AccountChip";
 import { BottomNav } from "@/components/BottomNav";
 import { Wordmark } from "@/components/brand/Logo";
 import { site } from "@/config/site";
+import { type AccountSummary, getAccountSummary } from "@/lib/account-value";
 import { getCurrentUser } from "@/lib/auth/session";
-import { usd } from "@/lib/format";
+
+// Streams in after the rest of the page so pricing never delays the first paint.
+async function AccountValue({ userId }: { userId: string }) {
+  let summary: AccountSummary | null = null;
+  try {
+    summary = await getAccountSummary(userId);
+  } catch (err) {
+    console.error("[nav] account summary:", err instanceof Error ? err.message : err);
+  }
+  return <AccountChip initial={summary} />;
+}
+
+function AccountValueSkeleton() {
+  return <div aria-hidden="true" className="ml-1 h-9 w-24 animate-pulse rounded-lg bg-surface md:w-48" />;
+}
 
 export async function Nav() {
   let user = null;
@@ -38,9 +55,9 @@ export async function Nav() {
                 Admin
               </Link>
             ) : null}
-            <Link href="/account" className="tabular ml-1 rounded-lg bg-surface px-2.5 py-1.5 font-semibold text-text hover:bg-surface-2" title={`${user.displayName}'s account`}>
-              {usd(user.cash, { cents: false })}
-            </Link>
+            <Suspense fallback={<AccountValueSkeleton />}>
+              <AccountValue userId={user.id} />
+            </Suspense>
             <BottomNav />
           </>
         ) : (

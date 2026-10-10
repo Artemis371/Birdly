@@ -1,6 +1,7 @@
 import "server-only";
 import { adminClient } from "@/lib/supabase/admin";
 import { currentSeasonId } from "@/lib/trading/deps";
+import { valueAccount } from "@/lib/account-value";
 import { markPrices } from "@/lib/valuation";
 
 export type LeaderRow = {
@@ -16,7 +17,7 @@ export type LeaderRow = {
 
 // Ranked by total account value: cash + every open position marked at its
 // current sell price (real best bid for Polymarket, LMSR price for Leahys).
-export async function loadLeaderboard(): Promise<{ rows: LeaderRow[]; stale: boolean; startingBalance: number }> {
+export async function loadLeaderboard(): Promise<{ rows: LeaderRow[]; stale: boolean; asOf: number | null; startingBalance: number }> {
   const db = adminClient();
   const season = await currentSeasonId();
   const [{ data: seasonRow }, { data: balances }, { data: positions }] = await Promise.all([
@@ -25,25 +26,18 @@ export async function loadLeaderboard(): Promise<{ rows: LeaderRow[]; stale: boo
     db.from("positions").select("user_id, token_id, shares").eq("season_id", season).gt("shares", 0),
   ]);
   const start = Number(seasonRow?.starting_balance ?? 10000);
-  const { prices, stale } = await markPrices((positions ?? []).map((p) => p.token_id as string));
+  const { prices, stale, asOf } = await markPrices((positions ?? []).map((p) => p.token_id as string));
 
-  const value = new Map<string, { v: number; n: number }>();
-  for (const p of positions ?? []) {
-    const e = value.get(p.user_id) ?? { v: 0, n: 0 };
-    e.v += Math.floor(Number(p.shares) * (prices[p.token_id] ?? 0) * 100) / 100;
-    e.n++;
-    value.set(p.user_id, e);
-  }
+  const byUser = new Map<string, { token_id: string; shares: string }[]>();
+  for (const p of positions ?? []) byUser.set(p.user_id, [...(byUser.get(p.user_id) ?? []), p]);
   type B = { user_id: string; cash: string; profiles: { display_name: string; deactivated_at: string | null } };
   const rows = ((balances ?? []) as unknown as B[])
     .filter((b) => !b.profiles.deactivated_at)
     .map((b) => {
-      const cash = Number(b.cash);
-      const positionsValue = Math.round((value.get(b.user_id)?.v ?? 0) * 100) / 100;
-      const total = Math.round((cash + positionsValue) * 100) / 100;
-      return { userId: b.user_id, displayName: b.profiles.display_name, cash, positionsValue, total, returnPct: (total - start) / start, openPositions: value.get(b.user_id)?.n ?? 0 };
+      const v = valueAccount(Number(b.cash), byUser.get(b.user_id) ?? [], prices);
+      return { userId: b.user_id, displayName: b.profiles.display_name, ...v, returnPct: (v.total - start) / start };
     });
-  return { rows: rankRows(rows), stale, startingBalance: start };
+  return { rows: rankRows(rows), stale, asOf, startingBalance: start };
 }
 
 // Sorted by total, highest first; ties share a rank (1, 2, 2, 4).

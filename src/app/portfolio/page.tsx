@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ValueChart } from "@/components/ValueChart";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import { EventThumb } from "@/components/markets/EventThumb";
 import { getCurrentUser } from "@/lib/auth/session";
 import { cents, shares, usd } from "@/lib/format";
@@ -47,12 +48,20 @@ export default async function PortfolioPage(props: PageProps<"/portfolio">) {
 
       {p.pricesStale ? (
         <div role="status" className="rounded-xl border border-warn/40 bg-warn/10 px-4 py-3 text-sm text-warn">
-          Live prices are delayed, so position values may be out of date.
+          Live prices are delayed, so this shows the last known prices
+          {p.pricesAsOf ? ` (from ${new Date(p.pricesAsOf).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })})` : ""}. Values update when prices come back.
         </div>
       ) : null}
 
       <section className="rounded-2xl border border-line bg-surface p-4">
-        <div className="text-xs text-muted">Account value</div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1 text-xs text-muted">
+            Portfolio <InfoTooltip label="What is Portfolio?" />
+          </div>
+          <Link href="/account" className="text-xs text-muted hover:text-text">
+            Account settings
+          </Link>
+        </div>
         <div className="tabular text-3xl font-bold">{usd(p.total)}</div>
         <div className="text-sm">
           <Signed v={p.pnl} pct={p.pnlPct} /> <span className="text-muted">all time</span>
